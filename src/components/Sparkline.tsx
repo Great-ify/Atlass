@@ -1,8 +1,9 @@
 import { useMemo } from 'react';
+import { motion } from 'motion/react';
 
 interface SparklineProps {
   data: number[];
-  color: 'success' | 'warning' | 'error' | 'info' | 'legendary';
+  color: 'success' | 'warning' | 'error' | 'info' | 'legendary' | 'zinc';
   width?: number;
   height?: number;
 }
@@ -13,6 +14,7 @@ const COLOR_MAP = {
   error: '#EF4444',
   info: '#3B82F6',
   legendary: '#A855F7',
+  zinc: '#71717A',
 };
 
 export default function Sparkline({ data, color, width = 120, height = 32 }: SparklineProps) {
@@ -56,14 +58,17 @@ export default function Sparkline({ data, color, width = 120, height = 32 }: Spa
       viewBox={`0 0 ${width} ${height}`}
       className="overflow-visible"
     >
-      <path
+      <motion.path
         d={pathData}
         fill="none"
         stroke={strokeColor}
         strokeWidth={1.5}
         strokeLinecap="round"
         strokeLinejoin="round"
-        className="transition-all duration-300"
+        initial={{ pathLength: 0 }}
+        whileInView={{ pathLength: 1 }}
+        viewport={{ once: true }}
+        transition={{ duration: 1.2, ease: 'easeOut' }}
       />
     </svg>
   );

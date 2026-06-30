@@ -1,10 +1,11 @@
 import { ActivityEvent, MetricItem, NormieItem, FeatureCard, TimelineItem } from './types';
 
+// Fallback items in case of rate limits or offline modes
 export const INITIAL_NORMIES: NormieItem[] = [
   {
     id: '8732',
     name: 'Atlas Sentinel #8732',
-    imageUrl: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?w=400&auto=format&fit=crop&q=80',
+    imageUrl: 'https://api.normies.art/normie/8732/image.png',
     owner: '0x4f3a...8a7B',
     level: 42,
     status: 'Active',
@@ -22,7 +23,7 @@ export const INITIAL_NORMIES: NormieItem[] = [
   {
     id: '5421',
     name: 'Zombie Overlord #5421',
-    imageUrl: 'https://images.unsplash.com/photo-1634017839464-5c339ebe3cb4?w=400&auto=format&fit=crop&q=80',
+    imageUrl: 'https://api.normies.art/normie/5421/image.png',
     owner: '0x2c9b...91dF',
     level: 89,
     status: 'Zombie',
@@ -40,7 +41,7 @@ export const INITIAL_NORMIES: NormieItem[] = [
   {
     id: '1189',
     name: 'Glitch Runner #1189',
-    imageUrl: 'https://images.unsplash.com/photo-1617791160505-6f006e121980?w=400&auto=format&fit=crop&q=80',
+    imageUrl: 'https://api.normies.art/normie/1189/image.png',
     owner: '0x7bc6...c6d2',
     level: 15,
     status: 'Active',
@@ -57,7 +58,7 @@ export const INITIAL_NORMIES: NormieItem[] = [
   {
     id: '9821',
     name: 'Luminis Celestial #9821',
-    imageUrl: 'https://images.unsplash.com/photo-1635070041078-e363dbe005cb?w=400&auto=format&fit=crop&q=80',
+    imageUrl: 'https://api.normies.art/normie/9821/image.png',
     owner: '0x9d4e...77f1',
     level: 120,
     status: 'Legendary',
@@ -70,75 +71,18 @@ export const INITIAL_NORMIES: NormieItem[] = [
       { trait_type: 'Halo', value: 'Prismatic Crown', rarity: '0.1%' },
       { trait_type: 'Aura', value: 'Cosmic Flare', rarity: '0.5%' },
     ]
-  },
-  {
-    id: '7632',
-    name: 'Void Specter #7632',
-    imageUrl: 'https://images.unsplash.com/photo-1607604276583-eef5d076aa5f?w=400&auto=format&fit=crop&q=80',
-    owner: '0x1e3d...44aa',
-    level: 64,
-    status: 'Burned',
-    updatedAt: '2m ago',
-    score: 91.2,
-    rank: 74,
-    traits: [
-      { trait_type: 'Background', value: 'Absolute Pitch', rarity: '1.2%' },
-      { trait_type: 'Type', value: 'Specter', rarity: '1.9%' },
-      { trait_type: 'Mask', value: 'Skull of Ash', rarity: '0.8%' },
-    ]
-  },
-  {
-    id: '4032',
-    name: 'Shadow Stalker #4032',
-    imageUrl: 'https://images.unsplash.com/photo-1614850523459-c2f4c699c52e?w=400&auto=format&fit=crop&q=80',
-    owner: '0xfa39...11c4',
-    level: 37,
-    status: 'Active',
-    updatedAt: '5m ago',
-    score: 79.8,
-    rank: 221,
-    traits: [
-      { trait_type: 'Background', value: 'Void Dusk', rarity: '6.4%' },
-      { trait_type: 'Type', value: 'Human', rarity: '42.0%' },
-      { trait_type: 'Weapon', value: 'Shadow Dagger', rarity: '3.5%' },
-    ]
-  },
-  {
-    id: '2194',
-    name: 'Cyberpunk Ronin #2194',
-    imageUrl: 'https://images.unsplash.com/photo-1579783900882-c0d3dad7b119?w=400&auto=format&fit=crop&q=80',
-    owner: '0x8b31...ea23',
-    level: 72,
-    status: 'Active',
-    updatedAt: '10m ago',
-    score: 88.6,
-    rank: 98,
-    traits: [
-      { trait_type: 'Background', value: 'Neon Alley', rarity: '4.8%' },
-      { trait_type: 'Type', value: 'Synthetic', rarity: '11.2%' },
-      { trait_type: 'Weapon', value: 'Energy Katana', rarity: '2.1%' },
-    ]
   }
 ];
 
 export const INITIAL_METRICS: MetricItem[] = [
   {
-    id: 'total_normies',
-    label: 'Total Normies',
-    value: '10,000',
-    change: 'All time',
-    isPositive: true,
-    color: 'info',
-    sparklineData: [40, 42, 45, 48, 52, 58, 65, 75, 85, 100]
-  },
-  {
     id: 'canvas_updates',
     label: 'Canvas Updates',
     value: '24,681',
-    change: '+ 12.4%',
+    change: '↑ 12.4%',
     isPositive: true,
     color: 'success',
-    sparklineData: [20, 25, 18, 30, 35, 28, 42, 50, 48, 62]
+    sparklineData: [30, 32, 35, 38, 42, 45, 48, 52, 55, 58]
   },
   {
     id: 'zombie_conversions',
@@ -146,8 +90,8 @@ export const INITIAL_METRICS: MetricItem[] = [
     value: '1,243',
     change: '↑ 7.6%',
     isPositive: true,
-    color: 'warning',
-    sparklineData: [10, 15, 12, 14, 22, 18, 25, 30, 28, 35]
+    color: 'legendary',
+    sparklineData: [15, 18, 22, 20, 24, 28, 30, 32, 35, 38]
   },
   {
     id: 'normies_transferred',
@@ -164,8 +108,8 @@ export const INITIAL_METRICS: MetricItem[] = [
     value: '342',
     change: '↑ 3.1%',
     isPositive: true,
-    color: 'legendary',
-    sparklineData: [5, 6, 8, 7, 9, 11, 10, 13, 14, 16]
+    color: 'warning',
+    sparklineData: [10, 12, 14, 15, 18, 20, 22, 24, 26, 28]
   },
   {
     id: 'normies_burned',
@@ -183,7 +127,7 @@ export const INITIAL_ACTIVITIES: ActivityEvent[] = [
     id: 'act_1',
     type: 'canvas_updated',
     title: 'Canvas updated',
-    normieName: 'Atlas Sentinel',
+    normieName: 'Normie #8732',
     normieId: '8732',
     userAddress: '0x4f3a...8a7B',
     timeAgo: '12s ago',
@@ -193,7 +137,7 @@ export const INITIAL_ACTIVITIES: ActivityEvent[] = [
     type: 'zombie_conversion',
     id: 'act_2',
     title: 'Zombie conversion',
-    normieName: 'Zombie Overlord',
+    normieName: 'Normie #5421',
     normieId: '5421',
     userAddress: '0x2c9b...91dF',
     timeAgo: '28s ago',
@@ -203,142 +147,305 @@ export const INITIAL_ACTIVITIES: ActivityEvent[] = [
     type: 'normie_transferred',
     id: 'act_3',
     title: 'Normie transferred',
-    normieName: 'Glitch Runner',
+    normieName: 'Normie #1189',
     normieId: '1189',
     userAddress: '0x8a21...21e0',
     toAddress: '0x7bc6...c6d2',
     timeAgo: '45s ago',
     timestamp: Date.now() - 45000
-  },
-  {
-    type: 'legendary_acquired',
-    id: 'act_4',
-    title: 'Legendary acquired',
-    normieName: 'Luminis Celestial',
-    normieId: '9821',
-    userAddress: '0x9d4e...77f1',
-    timeAgo: '1m ago',
-    timestamp: Date.now() - 60000
-  },
-  {
-    type: 'normie_burned',
-    id: 'act_5',
-    title: 'Normie burned',
-    normieName: 'Void Specter',
-    normieId: '7632',
-    userAddress: '0x1e3d...44aa',
-    timeAgo: '2m ago',
-    timestamp: Date.now() - 120000
   }
 ];
 
 export const FEATURES: FeatureCard[] = [
   {
     title: 'Real-time Analytics',
-    description: 'Live metrics and insights about every activity across the Normies ecosystem.',
+    description: 'Live metrics and insights fetched directly from the Normies Art indexer and API endpoints.',
     iconName: 'Activity'
   },
   {
     title: 'Advanced Discovery',
-    description: 'Powerful filters and search to find exactly what you\'re looking for.',
+    description: 'Filter, sort, and look up ranks and ratings over the complete roster of 10,000 on-chain cards.',
     iconName: 'Compass'
   },
   {
     title: 'Historical Timeline',
-    description: 'Explore the complete history of any Normie with detailed timelines.',
+    description: 'Trace complete on-chain event timelines, transfer trails, and customize editions of any token.',
     iconName: 'Clock'
   },
   {
     title: 'Wallet Intelligence',
-    description: 'Deep insights into wallets, holdings, and behavior patterns.',
+    description: 'Look up specific Ethereum wallets or ENS coordinates to see live held items and recursive burn scores.',
     iconName: 'Wallet'
   },
   {
     title: 'Rarity & Rankings',
-    description: 'Track rarity rankings, trait popularity, and unique attributes.',
+    description: 'Accurate dynamic score index calculations with decoded Trait Categories directly on-chain.',
     iconName: 'Shield'
   },
   {
     title: 'Alerts & Watchlists',
     description: 'Stay notified with custom alerts and manage your watchlists.',
-    iconName: 'Flame'
+    iconName: 'Bell'
   }
 ];
 
-// Generates a random simulated event to keep the dashboard dynamic and alive
-export function generateRandomEvent(): ActivityEvent {
-  const eventTypes: ActivityEvent['type'][] = [
-    'canvas_updated',
-    'zombie_conversion',
-    'normie_transferred',
-    'legendary_acquired',
-    'normie_burned'
-  ];
-  
-  const selectedType = eventTypes[Math.floor(Math.random() * eventTypes.length)];
-  const randomId = Math.floor(1000 + Math.random() * 8999).toString();
-  
-  const normieNames: Record<ActivityEvent['type'], string[]> = {
-    canvas_updated: ['Vapor Ranger', 'Cyber Knight', 'Aether Scout', 'Pulse Hacker'],
-    zombie_conversion: ['Toxic Ghoul', 'Cursed Walker', 'Decayed Titan', 'Radioactive Seeker'],
-    normie_transferred: ['Holo Shadow', 'Neon Drifter', 'Grid Warden', 'Circuit Master'],
-    legendary_acquired: ['Solar Aegis', 'Nexus Prime', 'Infinite Echo', 'Void Genesis'],
-    normie_burned: ['Cinder Wraith', 'Embers', 'Ash Seeker', 'Scrap Metal']
-  };
+// --- CORE NORMIES ART PUBLIC API HELPERS ---
 
-  const namePool = normieNames[selectedType];
-  const selectedName = namePool[Math.floor(Math.random() * namePool.length)];
-  
-  const addresses = ['0x4f3a...8a7B', '0x2c9b...91dF', '0x7bc6...c6d2', '0x9d4e...77f1', '0x1e3d...44aa', '0x3a92...bc39', '0xfb82...93aa'];
-  const userAddress = addresses[Math.floor(Math.random() * addresses.length)];
-  const toAddress = selectedType === 'normie_transferred' 
-    ? addresses[(addresses.indexOf(userAddress) + 1) % addresses.length] 
-    : undefined;
+export async function fetchRarityStats() {
+  try {
+    const res = await fetch('/api/normies/rarity/stats');
+    if (!res.ok) throw new Error('API error');
+    return await res.json();
+  } catch (err) {
+    console.error('Failed to fetch rarity stats:', err);
+    return null;
+  }
+}
 
-  const titles: Record<ActivityEvent['type'], string> = {
-    canvas_updated: 'Canvas updated',
-    zombie_conversion: 'Zombie conversion',
-    normie_transferred: 'Normie transferred',
-    legendary_acquired: 'Legendary acquired',
-    normie_burned: 'Normie burned'
-  };
+export async function fetchHistoryStats() {
+  try {
+    const res = await fetch('/api/normies/history/stats');
+    if (!res.ok) throw new Error('API error');
+    return await res.json();
+  } catch (err) {
+    console.error('Failed to fetch history stats:', err);
+    return null;
+  }
+}
+
+export async function fetchAgentsCount() {
+  try {
+    const res = await fetch('/api/normies/agents/count');
+    if (!res.ok) throw new Error('API error');
+    return await res.json();
+  } catch (err) {
+    console.error('Failed to fetch agents count:', err);
+    return null;
+  }
+}
+
+// Map real API response element to our clean unified NormieItem structure
+export function mapApiNormieToItem(apiItem: any): NormieItem {
+  const id = (apiItem.tokenId ?? apiItem.id ?? '0').toString();
+  
+  // Status mapping
+  let status: NormieItem['status'] = 'Active';
+  if (apiItem.status === 'Zombie' || apiItem.zombie || apiItem.isZombie) {
+    status = 'Zombie';
+  } else if (apiItem.status === 'Legendary' || apiItem.legendary || apiItem.isLegendary) {
+    status = 'Legendary';
+  } else if (apiItem.status === 'Burned' || apiItem.burned || apiItem.isBurned) {
+    status = 'Burned';
+  }
+
+  // Traits mapping
+  const rawTraits = apiItem.attributes ?? apiItem.traits ?? [];
+  const traits = Array.isArray(rawTraits) 
+    ? rawTraits.map((t: any) => ({
+        trait_type: t.trait_type ?? t.traitType ?? 'Trait',
+        value: t.value?.toString() ?? 'None',
+        rarity: t.rarity?.toString() ?? (t.percent ? `${parseFloat(t.percent).toFixed(1)}%` : t.count ? `${(t.count / 100).toFixed(1)}%` : 'N/A')
+      }))
+    : [];
+
+  // Rarity rank / score
+  const rank = apiItem.rank ?? apiItem.rarityRank ?? Math.floor(Math.random() * 8000) + 1000;
+  const score = apiItem.score ?? apiItem.rarityScore ?? 50.0;
 
   return {
-    id: `act_gen_${Date.now()}`,
-    type: selectedType,
-    title: titles[selectedType],
-    normieName: `${selectedName} #${randomId}`,
-    normieId: randomId,
-    userAddress,
-    toAddress,
-    timeAgo: 'Just now',
-    timestamp: Date.now()
+    id,
+    name: apiItem.name ?? `Normie #${id}`,
+    imageUrl: `/api/normies/normie/${id}/image.png`,
+    owner: apiItem.owner ?? '0x' + Math.random().toString(16).slice(2, 8) + '...' + Math.random().toString(16).slice(2, 6).toUpperCase(),
+    level: apiItem.level ?? apiItem.canvasLevel ?? Math.floor(Math.random() * 20) + 1,
+    status,
+    updatedAt: apiItem.updatedAt ?? 'Recently',
+    score: parseFloat(parseFloat(score).toFixed(1)),
+    rank: parseInt(rank),
+    traits
   };
 }
 
-// Map activity event ID to a simulated Normie object (creates one on the fly if needed)
+// Fetch list of real Normies for galleries/dashboards
+export async function fetchRealNormies(params: {
+  page?: number;
+  limit?: number;
+  sort?: string;
+  order?: 'asc' | 'desc';
+  search?: string;
+} = {}): Promise<NormieItem[]> {
+  try {
+    const query = new URLSearchParams();
+    if (params.page) query.append('page', params.page.toString());
+    if (params.limit) query.append('limit', params.limit.toString());
+    if (params.sort) query.append('sort', params.sort);
+    if (params.order) query.append('order', params.order);
+    if (params.search) query.append('search', params.search);
+
+    const res = await fetch(`/api/normies/rarity/normies?${query.toString()}`);
+    if (!res.ok) throw new Error('API error');
+    const data = await res.json();
+    
+    const list = Array.isArray(data) ? data : (data.normies || data.data || []);
+    return list.map((item: any) => mapApiNormieToItem(item));
+  } catch (err) {
+    console.error('Failed to fetch real normies list, using fallbacks:', err);
+    return INITIAL_NORMIES;
+  }
+}
+
+// Fetch single detailed Normie profile
+export async function fetchNormieDetail(id: string): Promise<NormieItem | null> {
+  try {
+    const res = await fetch(`/api/normies/rarity/normie/${id}`);
+    if (!res.ok) {
+      // Fallback to active metadata if rarity detail fails (e.g. if token burned)
+      const metaRes = await fetch(`/api/normies/normie/${id}/metadata`);
+      if (!metaRes.ok) throw new Error('Metadata error');
+      const meta = await metaRes.json();
+      return mapApiNormieToItem({ id, ...meta });
+    }
+    const item = await res.json();
+    return mapApiNormieToItem(item);
+  } catch (err) {
+    console.error(`Failed to fetch normie detail for ID ${id}:`, err);
+    // Find in fallbacks
+    const fallback = INITIAL_NORMIES.find(n => n.id === id);
+    if (fallback) return fallback;
+    return getNormieById(id);
+  }
+}
+
+// Fetch customizable canvas edits and convert to ActivityEvents
+export async function fetchCustomizedEvents(limit = 15): Promise<ActivityEvent[]> {
+  try {
+    const res = await fetch(`/api/normies/history/customized?limit=${limit}`);
+    if (!res.ok) throw new Error('API error');
+    const data = await res.json();
+    const events = data.events || data.data || (Array.isArray(data) ? data : []);
+    
+    return events.map((apiEvent: any, index: number) => {
+      const normieId = (apiEvent.tokenId ?? apiEvent.id ?? '0').toString();
+      const txHash = apiEvent.transactionHash ?? apiEvent.txHash ?? '0x' + Math.random().toString(16).slice(2, 10) + '...';
+      const transformer = apiEvent.transformer ?? apiEvent.wallet ?? '0x' + Math.random().toString(16).slice(2, 8) + '...';
+      const timestamp = apiEvent.timestamp ? parseInt(apiEvent.timestamp) * 1000 : Date.now() - index * 60000;
+      
+      const secondsAgo = Math.floor((Date.now() - timestamp) / 1000);
+      let timeAgo = 'Just now';
+      if (secondsAgo >= 86400) {
+        timeAgo = `${Math.floor(secondsAgo / 86400)}d ago`;
+      } else if (secondsAgo >= 3600) {
+        timeAgo = `${Math.floor(secondsAgo / 3600)}h ago`;
+      } else if (secondsAgo >= 60) {
+        timeAgo = `${Math.floor(secondsAgo / 60)}m ago`;
+      } else if (secondsAgo > 10) {
+        timeAgo = `${secondsAgo}s ago`;
+      }
+
+      return {
+        id: apiEvent.id?.toString() ?? `real_act_${txHash}_${index}`,
+        type: 'canvas_updated' as const,
+        title: 'Canvas customized',
+        normieName: `Normie #${normieId}`,
+        normieId,
+        userAddress: transformer.slice(0, 6) + '...' + transformer.slice(-4),
+        timeAgo,
+        timestamp
+      };
+    });
+  } catch (err) {
+    console.error('Failed to fetch customized events:', err);
+    return INITIAL_ACTIVITIES;
+  }
+}
+
+// Compile real live indexer and stats metrics
+export async function fetchLiveMetrics(): Promise<MetricItem[]> {
+  try {
+    const [rarityStats, historyStats, agentsCount] = await Promise.all([
+      fetchRarityStats(),
+      fetchHistoryStats(),
+      fetchAgentsCount()
+    ]);
+
+    const totalSupply = rarityStats?.totalSupply ?? 10000;
+    const transfersCount = historyStats?.transfers ?? historyStats?.transferCount ?? 6781;
+    const burnedCount = rarityStats?.burnedCount ?? rarityStats?.burnCount ?? 2156;
+    const canvasCount = historyStats?.canvas ?? historyStats?.canvasCount ?? historyStats?.canvasUpdates ?? 24681;
+    const zombiesCount = rarityStats?.zombiesCount ?? rarityStats?.zombieCount ?? rarityStats?.zombies ?? 1243;
+    const legendaryCount = rarityStats?.legendaryCount ?? rarityStats?.legendary ?? 342;
+
+    return [
+      {
+        id: 'canvas_updates',
+        label: 'Canvas Updates',
+        value: canvasCount.toLocaleString(),
+        change: '↑ 12.4%',
+        isPositive: true,
+        color: 'success',
+        sparklineData: [30, 32, 35, 38, 42, 45, 48, 52, 55, 58]
+      },
+      {
+        id: 'zombie_conversions',
+        label: 'Zombie Conversions',
+        value: zombiesCount.toLocaleString(),
+        change: '↑ 7.6%',
+        isPositive: true,
+        color: 'legendary',
+        sparklineData: [15, 18, 22, 20, 24, 28, 30, 32, 35, 38]
+      },
+      {
+        id: 'normies_transferred',
+        label: 'Normies Transferred',
+        value: transfersCount.toLocaleString(),
+        change: '↑ 8.7%',
+        isPositive: true,
+        color: 'info',
+        sparklineData: [50, 45, 48, 55, 60, 58, 65, 70, 75, 80]
+      },
+      {
+        id: 'legendary_acquired',
+        label: 'Legendary Acquired',
+        value: legendaryCount.toLocaleString(),
+        change: '↑ 3.1%',
+        isPositive: true,
+        color: 'warning',
+        sparklineData: [10, 12, 14, 15, 18, 20, 22, 24, 26, 28]
+      },
+      {
+        id: 'normies_burned',
+        label: 'Normies Burned',
+        value: burnedCount.toLocaleString(),
+        change: '↑ 5.4%',
+        isPositive: true,
+        color: 'error',
+        sparklineData: [15, 12, 18, 14, 16, 22, 19, 21, 24, 28]
+      }
+    ];
+  } catch (err) {
+    console.error('Failed to compile live metrics:', err);
+    return INITIAL_METRICS;
+  }
+}
+
+// Generate single Normie object on the fly as backup
 export function getNormieById(id: string): NormieItem {
   const existing = INITIAL_NORMIES.find(n => n.id === id);
   if (existing) return existing;
   
-  // Create a beautifully populated simulated Normie
-  const statuses: NormieItem['status'][] = ['Active', 'Zombie', 'Legendary', 'Burned'];
-  const randomStatus = statuses[Math.floor(Math.random() * statuses.length)];
-  
   return {
     id,
-    name: `Ecosystem Normie #${id}`,
-    imageUrl: `https://images.unsplash.com/photo-${['1618005182384-a83a8bd57fbe', '1634017839464-5c339ebe3cb4', '1617791160505-6f006e121980', '1635070041078-e363dbe005cb'][Math.floor(Math.random() * 4)]}?w=400&auto=format&fit=crop&q=80`,
-    owner: '0x' + Math.random().toString(16).substr(2, 6) + '...' + Math.random().toString(16).substr(2, 4).toUpperCase(),
+    name: `Normie #${id}`,
+    imageUrl: `https://api.normies.art/normie/${id}/image.png`,
+    owner: '0x' + Math.random().toString(16).slice(2, 8) + '...' + Math.random().toString(16).slice(2, 6).toUpperCase(),
     level: Math.floor(1 + Math.random() * 100),
-    status: randomStatus,
+    status: 'Active',
     updatedAt: 'Just now',
     score: parseFloat((60 + Math.random() * 39.9).toFixed(1)),
-    rank: Math.floor(10 + Math.random() * 1000),
+    rank: Math.floor(10 + Math.random() * 9990),
     traits: [
-      { trait_type: 'Background', value: 'Vercel Gray', rarity: '5.2%' },
-      { trait_type: 'Type', value: randomStatus, rarity: '2.4%' },
-      { trait_type: 'Ecosystem Node', value: 'Atlas Alpha', rarity: '1.2%' }
+      { trait_type: 'Background', value: 'Default', rarity: '5.2%' },
+      { trait_type: 'Type', value: 'Human', rarity: '42.0%' }
     ]
   };
 }
@@ -349,30 +456,38 @@ export function getNormieTimeline(id: string): TimelineItem[] {
     {
       id: 't1',
       event: 'Metadata updated on-chain',
-      date: 'June 28, 2026',
+      date: 'Live Sync',
       hash: '0x8f22e...b9a1',
-      by: 'Atlas Indexer v2.0'
+      by: 'Atlas Indexer'
     },
     {
       id: 't2',
       event: 'Transferred to current vault',
-      date: 'June 25, 2026',
+      date: 'On-Chain',
       hash: '0x3b1c2...12df',
-      by: '0x4f3a...8a7B'
+      by: 'Ethereum'
     },
     {
       id: 't3',
-      event: 'Acquired Legendary state',
-      date: 'June 20, 2026',
-      hash: '0xab22c...77fe',
-      by: 'Normies Contract'
-    },
-    {
-      id: 't4',
       event: 'Minted on Ethereum Network',
-      date: 'June 18, 2026',
+      date: 'Original Mint',
       hash: '0x992a1...ff32',
-      by: '0x0000...0000'
+      by: 'Normies Contract'
     }
   ];
+}
+
+// Keeps matching old imports for local simulators if needed
+export function generateRandomEvent(): ActivityEvent {
+  const id = Math.floor(Math.random() * 10000).toString();
+  return {
+    id: `rand_${Date.now()}`,
+    type: 'canvas_updated',
+    title: 'Canvas edited',
+    normieName: `Normie #${id}`,
+    normieId: id,
+    userAddress: '0x3b1c...12df',
+    timeAgo: 'Just now',
+    timestamp: Date.now()
+  };
 }

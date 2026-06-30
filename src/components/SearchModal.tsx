@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Search, Compass, TrendingUp, X, CornerDownLeft, Command, Skull, Shield } from 'lucide-react';
+import { Search, Compass, TrendingUp, X, CornerDownLeft, Command, Skull, Shield, Loader2 } from 'lucide-react';
 import { NormieItem } from '../types';
-import { INITIAL_NORMIES } from '../data';
+import { INITIAL_NORMIES, fetchRealNormies, fetchNormieDetail } from '../data';
 
 interface SearchModalProps {
   isOpen: boolean;
@@ -12,15 +12,77 @@ interface SearchModalProps {
 
 export default function SearchModal({ isOpen, onClose, onSelectNormie }: SearchModalProps) {
   const [query, setQuery] = useState('');
+  const [results, setResults] = useState<NormieItem[]>([]);
+  const [recentDiscoveries, setRecentDiscoveries] = useState<NormieItem[]>([]);
+  const [loading, setLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Auto focus input when opened
+  // Auto focus input and load recent items when opened
   useEffect(() => {
     if (isOpen) {
       setTimeout(() => inputRef.current?.focus(), 80);
       setQuery('');
+      setResults([]);
+      
+      // Fetch dynamic live recent discoveries
+      const loadRecent = async () => {
+        try {
+          const results = await fetchRealNormies({ limit: 3, sort: 'rank', order: 'asc' });
+          setRecentDiscoveries(results);
+        } catch (err) {
+          console.error('Failed to load recent discoveries:', err);
+        }
+      };
+      loadRecent();
     }
   }, [isOpen]);
+
+  // Live Query Search Logic
+  useEffect(() => {
+    if (!query.trim()) {
+      setResults([]);
+      return;
+    }
+
+    const delayDebounceFn = setTimeout(async () => {
+      setLoading(true);
+      try {
+        const cleanQuery = query.trim();
+        
+        // If query is an exact integer, try fetching that token ID directly to provide instant lookup!
+        const isNumeric = /^\d+$/.test(cleanQuery);
+        const numericValue = isNumeric ? parseInt(cleanQuery, 10) : -1;
+        
+        let apiResults: NormieItem[] = [];
+        
+        if (isNumeric && numericValue >= 0 && numericValue <= 9999) {
+          const detail = await fetchNormieDetail(cleanQuery);
+          if (detail) {
+            apiResults.push(detail);
+          }
+        }
+        
+        // Fetch regular list matching search terms
+        const searchResults = await fetchRealNormies({ search: cleanQuery, limit: 10 });
+        
+        // Merge without duplicates
+        const merged = [...apiResults];
+        searchResults.forEach(sr => {
+          if (!merged.some(m => m.id === sr.id)) {
+            merged.push(sr);
+          }
+        });
+
+        setResults(merged);
+      } catch (err) {
+        console.error('Search query error:', err);
+      } finally {
+        setLoading(false);
+      }
+    }, 300); // 300ms debounce
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [query]);
 
   // Handle keyboard shortcuts (ESC to close)
   useEffect(() => {
@@ -32,23 +94,6 @@ export default function SearchModal({ isOpen, onClose, onSelectNormie }: SearchM
   }, [onClose]);
 
   if (!isOpen) return null;
-
-  // Filter Normies based on user query
-  const filteredNormies = INITIAL_NORMIES.filter(normie => {
-    const q = query.toLowerCase();
-    return (
-      normie.id.includes(q) ||
-      normie.name.toLowerCase().includes(q) ||
-      normie.owner.toLowerCase().includes(q) ||
-      normie.traits.some(t => t.value.toLowerCase().includes(q) || t.trait_type.toLowerCase().includes(q))
-    );
-  });
-
-  const recentSearches = [
-    { label: 'Zombie Overlord #5421', type: 'zombie', id: '5421' },
-    { label: 'Luminis Celestial #9821', type: 'legendary', id: '9821' },
-    { label: 'Level 100+ Traits', type: 'search' },
-  ];
 
   return (
     <AnimatePresence>
@@ -77,15 +122,19 @@ export default function SearchModal({ isOpen, onClose, onSelectNormie }: SearchM
             <input
               ref={inputRef}
               type="text"
-              placeholder="Search by name, wallet address, trait, or block ID..."
+              placeholder="Search by ID (0-9999), owner, or trait..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               className="w-full bg-transparent text-sm text-atlas-primary outline-none placeholder:text-zinc-600 font-sans"
             />
             
-            {/* ESC badge */}
-            <div className="flex items-center gap-1 shrink-0">
-              <span className="text-[10px] bg-atlas-bg border border-atlas-border px-1.5 py-0.5 rounded text-zinc-500 font-mono">ESC</span>
+            {/* ESC badge or Loader */}
+            <div className="flex items-center gap-2 shrink-0">
+              {loading ? (
+                <Loader2 className="w-3.5 h-3.5 text-atlas-secondary animate-spin" />
+              ) : (
+                <span className="text-[10px] bg-atlas-bg border border-atlas-border px-1.5 py-0.5 rounded text-zinc-500 font-mono">ESC</span>
+              )}
             </div>
           </div>
 
@@ -98,32 +147,33 @@ export default function SearchModal({ isOpen, onClose, onSelectNormie }: SearchM
                   Recent Discoveries
                 </div>
                 <div className="mt-1 space-y-1">
-                  {recentSearches.map((item, idx) => {
-                    const matchedNormie = INITIAL_NORMIES.find(n => n.id === item.id);
-                    return (
-                      <button
-                        key={idx}
-                        onClick={() => {
-                          if (matchedNormie) {
-                            onSelectNormie(matchedNormie);
+                  {recentDiscoveries.length === 0 ? (
+                    <div className="px-3 py-2 text-xs text-zinc-500 font-mono">Loading real-time indexes...</div>
+                  ) : (
+                    recentDiscoveries.map((item) => {
+                      return (
+                        <button
+                          key={item.id}
+                          onClick={() => {
+                            onSelectNormie(item);
                             onClose();
-                          }
-                        }}
-                        className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-left text-xs font-mono text-atlas-secondary hover:text-atlas-primary hover:bg-atlas-bg border border-transparent hover:border-atlas-border transition-all"
-                      >
-                        <div className="flex items-center gap-2">
-                          {item.type === 'zombie' && <Skull className="w-3.5 h-3.5 text-amber-500" />}
-                          {item.type === 'legendary' && <Shield className="w-3.5 h-3.5 text-purple-500" />}
-                          {item.type === 'search' && <Compass className="w-3.5 h-3.5 text-atlas-secondary" />}
-                          <span>{item.label}</span>
-                        </div>
-                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 font-sans text-[10px] text-zinc-600">
-                          <span>Open</span>
-                          <CornerDownLeft className="w-3 h-3" />
-                        </div>
-                      </button>
-                    );
-                  })}
+                          }}
+                          className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-left text-xs font-mono text-atlas-secondary hover:text-atlas-primary hover:bg-atlas-bg border border-transparent hover:border-atlas-border transition-all"
+                        >
+                          <div className="flex items-center gap-2">
+                            {item.status === 'Zombie' && <Skull className="w-3.5 h-3.5 text-amber-500" />}
+                            {item.status === 'Legendary' && <Shield className="w-3.5 h-3.5 text-purple-500" />}
+                            {item.status === 'Active' && <Compass className="w-3.5 h-3.5 text-atlas-secondary" />}
+                            <span>{item.name} (Rank #{item.rank})</span>
+                          </div>
+                          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 font-sans text-[10px] text-zinc-600">
+                            <span>Open</span>
+                            <CornerDownLeft className="w-3 h-3" />
+                          </div>
+                        </button>
+                      );
+                    })
+                  )}
                 </div>
 
                 <div className="px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider text-zinc-600 mt-4">
@@ -146,14 +196,14 @@ export default function SearchModal({ isOpen, onClose, onSelectNormie }: SearchM
                   </button>
                 </div>
               </div>
-            ) : filteredNormies.length > 0 ? (
+            ) : results.length > 0 ? (
               // Results found
               <div>
                 <div className="px-3 py-1.5 text-[10px] font-mono uppercase tracking-wider text-zinc-600">
-                  Matching Ecosystem Items ({filteredNormies.length})
+                  Matching Ecosystem Items ({results.length})
                 </div>
                 <div className="mt-1 space-y-0.5">
-                  {filteredNormies.map((normie) => (
+                  {results.map((normie) => (
                     <button
                       key={normie.id}
                       onClick={() => {

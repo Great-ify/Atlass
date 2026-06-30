@@ -1,0 +1,42 @@
+@import url('https://fonts.googleapis.com/css2?family=Geist:wght@100..900&family=Geist+Mono:wght@100..900&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --color-atlas-bg: #09090B;
+  --color-atlas-surface: #111113;
+  --color-atlas-card: #18181B;
+  --color-atlas-border: #27272A;
+  --color-atlas-primary: #FAFAFA;
+  --color-atlas-secondary: #A1A1AA;
+  --color-atlas-success: #22C55E;
+  --color-atlas-warning: #F59E0B;
+  --color-atlas-error: #EF4444;
+  --color-atlas-info: #3B82F6;
+  --color-atlas-legendary: #A855F7;
+
+  --font-sans: "Geist", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "Geist Mono", "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+}
+
+body {
+  background-color: var(--color-atlas-bg);
+  color: var(--color-atlas-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom scrollbar matching Vercel/Linear dark theme */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-atlas-bg);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-atlas-border);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-atlas-secondary);
+}

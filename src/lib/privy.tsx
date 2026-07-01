@@ -69,7 +69,10 @@ export function PrivyProvider({ children }: { children: React.ReactNode }) {
   const [authenticated, setAuthenticated] = useState(false);
   const [user, setUser] = useState<PrivyUser | null>(null);
   const [isLoginOpen, setIsLoginOpen] = useState(false);
-  const [triggerAppRedirect, setTriggerAppRedirect] = useState<(() => void) | null>(null);
+  const redirectRef = useRef<(() => void) | null>(null);
+  const setTriggerAppRedirect = (fn: (() => void) | null) => {
+    redirectRef.current = fn;
+  };
 
   // Modal Step: 'providers' | 'wallets' | 'connecting'
   const [modalStep, setModalStep] = useState<'providers' | 'wallets' | 'connecting'>('providers');
@@ -148,9 +151,9 @@ export function PrivyProvider({ children }: { children: React.ReactNode }) {
     setIsLoginOpen(false);
 
     // Call dynamic app launch redirect if available
-    if (triggerAppRedirect) {
+    if (redirectRef.current) {
       setTimeout(() => {
-        triggerAppRedirect();
+        redirectRef.current?.();
       }, 300);
     }
   };
@@ -231,7 +234,7 @@ export function PrivyProvider({ children }: { children: React.ReactNode }) {
       logout,
       isLoginOpen,
       closeLogin,
-      triggerAppRedirect,
+      triggerAppRedirect: redirectRef.current,
       setTriggerAppRedirect
     }}>
       {children}

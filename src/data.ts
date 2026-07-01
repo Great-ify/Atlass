@@ -1,12 +1,30 @@
 import { ActivityEvent, MetricItem, NormieItem, FeatureCard, TimelineItem } from './types';
 
+export function generateRandomAddress(): string {
+  const chars = '0123456789abcdef';
+  let addr = '0x';
+  for (let i = 0; i < 40; i++) {
+    addr += chars[Math.floor(Math.random() * 16)];
+  }
+  return addr;
+}
+
+export function generateRandomTxHash(): string {
+  const chars = '0123456789abcdef';
+  let hash = '0x';
+  for (let i = 0; i < 64; i++) {
+    hash += chars[Math.floor(Math.random() * 16)];
+  }
+  return hash;
+}
+
 // Fallback items in case of rate limits or offline modes
 export const INITIAL_NORMIES: NormieItem[] = [
   {
     id: '8732',
     name: 'Atlas Sentinel #8732',
     imageUrl: 'https://api.normies.art/normie/8732/image.png',
-    owner: '0x4f3a...8a7B',
+    owner: '0x4f3a9e14a601be0d5f2a1b3c4d5e6f7a8b9c8a7B',
     level: 42,
     status: 'Active',
     updatedAt: '12s ago',
@@ -24,7 +42,7 @@ export const INITIAL_NORMIES: NormieItem[] = [
     id: '5421',
     name: 'Zombie Overlord #5421',
     imageUrl: 'https://api.normies.art/normie/5421/image.png',
-    owner: '0x2c9b...91dF',
+    owner: '0x2c9b9e14a601be0d5f2a1b3c4d5e6f7a8b9c91dF',
     level: 89,
     status: 'Zombie',
     updatedAt: '28s ago',
@@ -42,7 +60,7 @@ export const INITIAL_NORMIES: NormieItem[] = [
     id: '1189',
     name: 'Glitch Runner #1189',
     imageUrl: 'https://api.normies.art/normie/1189/image.png',
-    owner: '0x7bc6...c6d2',
+    owner: '0x7bc69e14a601be0d5f2a1b3c4d5e6f7a8b9cc6d2',
     level: 15,
     status: 'Active',
     updatedAt: '45s ago',
@@ -59,7 +77,7 @@ export const INITIAL_NORMIES: NormieItem[] = [
     id: '9821',
     name: 'Luminis Celestial #9821',
     imageUrl: 'https://api.normies.art/normie/9821/image.png',
-    owner: '0x9d4e...77f1',
+    owner: '0x9d4e9e14a601be0d5f2a1b3c4d5e6f7a8b9c77f1',
     level: 120,
     status: 'Legendary',
     updatedAt: '1m ago',
@@ -129,7 +147,7 @@ export const INITIAL_ACTIVITIES: ActivityEvent[] = [
     title: 'Canvas updated',
     normieName: 'Normie #8732',
     normieId: '8732',
-    userAddress: '0x4f3a...8a7B',
+    userAddress: '0x4f3a9e14a601be0d5f2a1b3c4d5e6f7a8b9c8a7B',
     timeAgo: '12s ago',
     timestamp: Date.now() - 12000
   },
@@ -139,7 +157,7 @@ export const INITIAL_ACTIVITIES: ActivityEvent[] = [
     title: 'Zombie conversion',
     normieName: 'Normie #5421',
     normieId: '5421',
-    userAddress: '0x2c9b...91dF',
+    userAddress: '0x2c9b9e14a601be0d5f2a1b3c4d5e6f7a8b9c91dF',
     timeAgo: '28s ago',
     timestamp: Date.now() - 28000
   },
@@ -149,8 +167,8 @@ export const INITIAL_ACTIVITIES: ActivityEvent[] = [
     title: 'Normie transferred',
     normieName: 'Normie #1189',
     normieId: '1189',
-    userAddress: '0x8a21...21e0',
-    toAddress: '0x7bc6...c6d2',
+    userAddress: '0x8a219e14a601be0d5f2a1b3c4d5e6f7a8b9c21e0',
+    toAddress: '0x7bc69e14a601be0d5f2a1b3c4d5e6f7a8b9cc6d2',
     timeAgo: '45s ago',
     timestamp: Date.now() - 45000
   }
@@ -256,7 +274,7 @@ export function mapApiNormieToItem(apiItem: any): NormieItem {
     id,
     name: apiItem.name ?? `Normie #${id}`,
     imageUrl: `/api/normies/normie/${id}/image.png`,
-    owner: apiItem.owner ?? '0x' + Math.random().toString(16).slice(2, 8) + '...' + Math.random().toString(16).slice(2, 6).toUpperCase(),
+    owner: apiItem.owner ?? generateRandomAddress(),
     level: apiItem.level ?? apiItem.canvasLevel ?? Math.floor(Math.random() * 20) + 1,
     status,
     updatedAt: apiItem.updatedAt ?? 'Recently',
@@ -326,8 +344,8 @@ export async function fetchCustomizedEvents(limit = 15): Promise<ActivityEvent[]
     
     return events.map((apiEvent: any, index: number) => {
       const normieId = (apiEvent.tokenId ?? apiEvent.id ?? '0').toString();
-      const txHash = apiEvent.transactionHash ?? apiEvent.txHash ?? '0x' + Math.random().toString(16).slice(2, 10) + '...';
-      const transformer = apiEvent.transformer ?? apiEvent.wallet ?? '0x' + Math.random().toString(16).slice(2, 8) + '...';
+      const txHash = apiEvent.transactionHash ?? apiEvent.txHash ?? generateRandomTxHash();
+      const transformer = apiEvent.transformer ?? apiEvent.wallet ?? generateRandomAddress();
       const timestamp = apiEvent.timestamp ? parseInt(apiEvent.timestamp) * 1000 : Date.now() - index * 60000;
       
       const secondsAgo = Math.floor((Date.now() - timestamp) / 1000);
@@ -437,7 +455,7 @@ export function getNormieById(id: string): NormieItem {
     id,
     name: `Normie #${id}`,
     imageUrl: `https://api.normies.art/normie/${id}/image.png`,
-    owner: '0x' + Math.random().toString(16).slice(2, 8) + '...' + Math.random().toString(16).slice(2, 6).toUpperCase(),
+    owner: generateRandomAddress(),
     level: Math.floor(1 + Math.random() * 100),
     status: 'Active',
     updatedAt: 'Just now',
@@ -457,21 +475,21 @@ export function getNormieTimeline(id: string): TimelineItem[] {
       id: 't1',
       event: 'Metadata updated on-chain',
       date: 'Live Sync',
-      hash: '0x8f22e...b9a1',
+      hash: '0x8f22e1234567890abcdef1234567890abcdef1234567890abcdef12345678b9a1',
       by: 'Atlas Indexer'
     },
     {
       id: 't2',
       event: 'Transferred to current vault',
       date: 'On-Chain',
-      hash: '0x3b1c2...12df',
+      hash: '0x3b1c21234567890abcdef1234567890abcdef1234567890abcdef1234567812df',
       by: 'Ethereum'
     },
     {
       id: 't3',
       event: 'Minted on Ethereum Network',
       date: 'Original Mint',
-      hash: '0x992a1...ff32',
+      hash: '0x992a11234567890abcdef1234567890abcdef1234567890abcdef12345678ff32',
       by: 'Normies Contract'
     }
   ];
@@ -486,8 +504,78 @@ export function generateRandomEvent(): ActivityEvent {
     title: 'Canvas edited',
     normieName: `Normie #${id}`,
     normieId: id,
-    userAddress: '0x3b1c...12df',
+    userAddress: '0x3b1c21234567890abcdef1234567890abcdef12df',
     timeAgo: 'Just now',
     timestamp: Date.now()
   };
+}
+
+export interface TraitStatItem {
+  id: string;
+  name: string;
+  category: string;
+  percentage: number;
+}
+
+export async function fetchTopTraits(): Promise<TraitStatItem[]> {
+  try {
+    const res = await fetch('/api/normies/rarity/traits');
+    if (!res.ok) throw new Error('API error');
+    const data = await res.json();
+    
+    const traitList: TraitStatItem[] = [];
+    let traitId = 1;
+    
+    if (data && typeof data === 'object') {
+      Object.entries(data).forEach(([category, values]) => {
+        if (values && typeof values === 'object') {
+          Object.entries(values).forEach(([value, countObj]) => {
+            let count = 0;
+            let percent = 0.0;
+            if (typeof countObj === 'number') {
+              count = countObj;
+              percent = (count / 10000) * 100;
+            } else if (countObj && typeof countObj === 'object') {
+              const obj = countObj as any;
+              count = obj.count ?? obj.liveCount ?? 0;
+              percent = obj.percent ?? obj.percentage ?? ((count / 10000) * 100);
+            }
+            
+            // Filter out backgrounds or 'None' or common type values to get interesting traits
+            if (value !== 'None' && value !== 'Default' && category !== 'Gender' && value !== 'Human') {
+              traitList.push({
+                id: (traitId++).toString(),
+                name: value,
+                category,
+                percentage: parseFloat(percent.toFixed(1))
+              });
+            }
+          });
+        }
+      });
+    }
+    
+    traitList.sort((a, b) => b.percentage - a.percentage);
+    
+    if (traitList.length === 0) {
+      return [
+        { id: '1', name: 'Alien', category: 'Type', percentage: 24.6 },
+        { id: '2', name: 'Cowboy Hat', category: 'Accessory', percentage: 18.3 },
+        { id: '3', name: 'Sunglasses', category: 'Eyes', percentage: 14.7 },
+        { id: '4', name: 'Classic Shades', category: 'Eyes', percentage: 11.2 },
+        { id: '5', name: 'Full Beard', category: 'Facial Feature', percentage: 8.9 }
+      ];
+    }
+    
+    return traitList.slice(0, 5);
+  } catch (err) {
+    console.error('Failed to fetch top traits, using fallback:', err);
+    return [
+      { id: '1', name: 'Alien', category: 'Type', percentage: 24.6 },
+      { id: '2', name: 'Cowboy Hat', category: 'Accessory', percentage: 18.3 },
+      { id: '3', name: 'Sunglasses', category: 'Eyes', percentage: 14.7 },
+      { id: '4', name: 'Classic Shades', category: 'Eyes', percentage: 11.2 },
+      { id: '5', name: 'Full Beard', category: 'Facial Feature', percentage: 8.9 }
+    ];
+  }
 }

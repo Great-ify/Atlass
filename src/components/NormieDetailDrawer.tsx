@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { X, ExternalLink, Copy, Check, Shield, Layers, Calendar, User, Zap, Activity, Grid } from 'lucide-react';
 import { NormieItem } from '../types';
 import { getNormieTimeline } from '../data';
+import { usePrivy } from '../lib/privy';
 
 interface NormieDetailDrawerProps {
   normie: NormieItem | null;
@@ -10,6 +11,13 @@ interface NormieDetailDrawerProps {
 }
 
 export default function NormieDetailDrawer({ normie, onClose }: NormieDetailDrawerProps) {
+  const { authenticated, user } = usePrivy();
+  const walletConnected = authenticated && user;
+
+  const displayAddress = (addr: string) => {
+    return walletConnected ? 'User' : (addr && addr.length > 10 ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : (addr || 'Guest'));
+  };
+
   const [copied, setCopied] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'history' | 'canvas' | 'traits' | 'activity'>('overview');
   const timeline = normie ? getNormieTimeline(normie.id) : [];
@@ -121,18 +129,20 @@ export default function NormieDetailDrawer({ normie, onClose }: NormieDetailDraw
                 <div className="bg-[#111113]/50 border border-zinc-800/60 p-3 rounded-lg space-y-1.5">
                   <span className="block text-[8px] font-mono text-zinc-500 uppercase tracking-wider">Current Owner Vault</span>
                   <div className="flex items-center justify-between text-[11px] font-mono text-white">
-                    <span className="truncate max-w-[140px]">{normie.owner}</span>
+                    <span className="truncate max-w-[140px]" title={normie.owner}>
+                      {displayAddress(normie.owner)}
+                    </span>
                     <button onClick={handleCopy} className="text-zinc-500 hover:text-white transition-colors ml-1 shrink-0">
                       {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
                     </button>
                   </div>
                   <a 
-                    href={`https://etherscan.io/address/${normie.owner}`} 
+                    href={`https://basescan.org/nft/0x4016a1E2beC70BBAfA0F1cb6982E475f429B51E0/${normie.id}`} 
                     target="_blank" 
                     rel="noreferrer" 
                     className="text-[9px] text-zinc-400 hover:text-white font-mono flex items-center gap-1 mt-2.5 w-fit hover:underline"
                   >
-                    <span>Etherscan Verification</span>
+                    <span>Basescan Verification</span>
                     <ExternalLink className="w-2.5 h-2.5" />
                   </a>
                 </div>

@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Search, Compass, TrendingUp, X, CornerDownLeft, Command, Skull, Shield, Loader2 } from 'lucide-react';
 import { NormieItem } from '../types';
 import { INITIAL_NORMIES, fetchRealNormies, fetchNormieDetail } from '../data';
+import { usePrivy } from '../lib/privy';
 
 interface SearchModalProps {
   isOpen: boolean;
@@ -11,6 +12,13 @@ interface SearchModalProps {
 }
 
 export default function SearchModal({ isOpen, onClose, onSelectNormie }: SearchModalProps) {
+  const { authenticated, user } = usePrivy();
+  const walletConnected = authenticated && user;
+
+  const displayAddress = (addr: string) => {
+    return walletConnected ? 'User' : (addr && addr.length > 10 ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : (addr || 'Guest'));
+  };
+
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<NormieItem[]>([]);
   const [recentDiscoveries, setRecentDiscoveries] = useState<NormieItem[]>([]);
@@ -225,7 +233,7 @@ export default function SearchModal({ isOpen, onClose, onSelectNormie }: SearchM
                             <span className="text-[9px] text-zinc-500 font-mono">#{normie.id}</span>
                           </div>
                           <div className="text-[10px] font-mono text-atlas-secondary truncate max-w-[340px] mt-0.5">
-                            Owner: {normie.owner} • Level {normie.level}
+                            Owner: {displayAddress(normie.owner)} • Level {normie.level}
                           </div>
                         </div>
                       </div>

@@ -268,7 +268,7 @@ export default function App() {
                 <ArrowUpRight className="w-3.5 h-3.5 text-zinc-400 group-hover:text-white group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-all" />
               </button>
 
-              {authenticated ? (
+              {authenticated && (
                 <div className="relative">
                   <button 
                     onClick={() => setDropdownOpen(prev => !prev)}
@@ -298,7 +298,7 @@ export default function App() {
                           {/* User Header info */}
                           <div className="px-3 py-1.5 border-b border-zinc-900 mb-1">
                             <p className="text-[10px] font-mono font-bold text-white truncate">
-                              {user?.wallet ? user.wallet.address : (user?.google ? user.google.email : user?.x?.username)}
+                              User
                             </p>
                             <p className="text-[8px] font-mono text-zinc-500 uppercase tracking-wider mt-0.5">
                               {user?.type} connected
@@ -308,7 +308,7 @@ export default function App() {
                           <button
                             onClick={() => {
                               setDropdownOpen(false);
-                              alert(`Atlas User Profile:\n\nID: ${user?.id}\nType: ${user?.type}\nName: ${user?.wallet?.name || user?.google?.name || user?.x?.name || 'Explorer'}`);
+                              triggerToast(`Session Profile: Connected as User via ${user?.type || 'Privy'}`);
                             }}
                             className="w-full flex items-center gap-2 px-3 py-1.5 text-left text-xs text-zinc-300 hover:text-white hover:bg-zinc-800/50 transition-colors cursor-pointer"
                           >
@@ -347,13 +347,6 @@ export default function App() {
                     )}
                   </AnimatePresence>
                 </div>
-              ) : (
-                <button 
-                  onClick={login}
-                  className="bg-purple-600 hover:bg-purple-500 border border-purple-500/30 text-white text-xs font-semibold px-4 py-1.5 rounded-full transition-all flex items-center gap-1.5 shadow-[0_2px_8px_rgba(147,51,234,0.3)] cursor-pointer"
-                >
-                  <span>Sign In</span>
-                </button>
               )}
             </div>
           </header>
@@ -657,7 +650,7 @@ export default function App() {
               {/* Quick launch links info */}
               <div className="flex flex-wrap items-center gap-4 text-[10px] text-zinc-500 font-mono justify-start">
                 <button onClick={() => setDemoActive(true)} className="hover:text-atlas-primary transition-colors flex items-center gap-1">
-                  <span>● Simulated Sandbox Live</span>
+                  <span>● Launch Explorer</span>
                   <ArrowRight className="w-3 h-3" />
                 </button>
                 <span>•</span>

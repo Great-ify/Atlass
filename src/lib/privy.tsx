@@ -158,11 +158,45 @@ export function PrivyProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const handleWalletSelect = (walletName: string) => {
+  const handleWalletSelect = async (walletName: string) => {
     setSelectedWallet(walletName);
     setModalStep('connecting');
+    setLoginError(null);
     setConnectingStatus(`Requesting connection to ${walletName}...`);
     
+    // Check for web3 provider window.ethereum if connecting to MetaMask
+    if (walletName === 'MetaMask') {
+      const anyWindow = window as any;
+      if (anyWindow.ethereum) {
+        try {
+          setConnectingStatus('Connecting to MetaMask extension...');
+          const accounts = await anyWindow.ethereum.request({ method: 'eth_requestAccounts' });
+          if (accounts && accounts.length > 0) {
+            const rawAddr = accounts[0];
+            const displayAddress = rawAddr.substring(0, 6) + '...' + rawAddr.substring(rawAddr.length - 4);
+            const userData: PrivyUser = {
+              id: 'usr_' + Math.random().toString(36).substring(2, 11),
+              type: 'wallet',
+              wallet: {
+                address: displayAddress,
+                name: 'MetaMask'
+              },
+              avatarUrl: `https://api.normies.art/normie/${Math.floor(Math.random() * 200) + 1}/image.png`
+            };
+            triggerSuccessfulLogin(userData);
+          } else {
+            throw new Error('No accounts returned from MetaMask');
+          }
+        } catch (err: any) {
+          console.error('MetaMask connection error:', err);
+          setLoginError('Failed to connect to MetaMask (extension handshake blocked by sandbox iframe restrictions). You can use our secure Sandbox Wallet Fallback instead!');
+          setModalStep('wallets');
+        }
+        return;
+      }
+    }
+
+    // Default simulated path for non-metamask or if window.ethereum is not present
     setTimeout(() => {
       setConnectingStatus(`Awaiting cryptographic signature inside ${walletName}...`);
       setTimeout(() => {
@@ -294,6 +328,55 @@ export function PrivyProvider({ children }: { children: React.ReactNode }) {
               {/* Steps Area */}
               <div className="w-full mt-6 min-h-[180px] flex flex-col justify-center">
                 
+                {loginError && (
+                  <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-xs text-red-400 flex flex-col gap-2.5 text-left relative">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-red-500" />
+                      <div className="flex-1 pr-4">
+                        <p className="font-semibold text-red-400">Connection Error</p>
+                        <p className="text-[10px] text-zinc-400 mt-0.5 leading-relaxed">{loginError}</p>
+                      </div>
+                      <button 
+                        onClick={() => setLoginError(null)}
+                        className="absolute top-2 right-2 text-zinc-500 hover:text-white cursor-pointer"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                    {loginError.includes('MetaMask') && (
+                      <button
+                        onClick={async () => {
+                          setLoginError(null);
+                          setModalStep('connecting');
+                          setConnectingStatus('Launching with Sandbox secure handshake...');
+                          setTimeout(() => {
+                            // Generate random wallet address
+                            const chars = '0123456789abcdef';
+                            let addr = '0x';
+                            for (let i = 0; i < 40; i++) {
+                              addr += chars[Math.floor(Math.random() * 16)];
+                            }
+                            const userAddress = addr.substring(0, 6) + '...' + addr.substring(36);
+                            const userData: PrivyUser = {
+                              id: 'usr_' + Math.random().toString(36).substring(2, 11),
+                              type: 'wallet',
+                              wallet: {
+                                address: userAddress,
+                                name: 'MetaMask (Sandbox)'
+                              },
+                              avatarUrl: `https://api.normies.art/normie/${Math.floor(Math.random() * 200) + 1}/image.png`
+                            };
+                            triggerSuccessfulLogin(userData);
+                          }, 800);
+                        }}
+                        className="w-full py-1.5 px-3 bg-red-950/40 hover:bg-red-900/40 border border-red-500/20 text-[10px] text-red-200 hover:text-white rounded-md font-medium transition-colors cursor-pointer text-center"
+                      >
+                        Launch with Sandbox Wallet Fallback
+                      </button>
+                    )}
+                  </div>
+                )}
+                
                 {/* Step 1: Login Providers Options */}
                 {modalStep === 'providers' && (
                   <div className="space-y-2.5 w-full">
@@ -350,7 +433,7 @@ export function PrivyProvider({ children }: { children: React.ReactNode }) {
                     </div>
 
                     {[
-                      { name: 'MetaMask', iconColor: 'text-amber-500' },
+                      { name: 'MetaMask', iconColor: 'text-orange-500' },
                       { name: 'Rabby', iconColor: 'text-blue-500' },
                       { name: 'Coinbase Wallet', iconColor: 'text-blue-600' },
                       { name: 'WalletConnect', iconColor: 'text-sky-500' }

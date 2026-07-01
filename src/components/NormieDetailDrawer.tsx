@@ -15,12 +15,20 @@ export default function NormieDetailDrawer({ normie, onClose }: NormieDetailDraw
   const walletConnected = authenticated && user;
 
   const displayAddress = (addr: string) => {
-    return walletConnected ? 'User' : (addr && addr.length > 10 ? `${addr.slice(0, 6)}...${addr.slice(-4)}` : (addr || 'Guest'));
+    if (!addr) return 'Guest';
+    const userAddr = user?.wallet?.address;
+    if (userAddr && addr.toLowerCase() === userAddr.toLowerCase()) {
+      return 'You';
+    }
+    if (addr.length > 10) {
+      return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
+    }
+    return addr;
   };
 
   const [copied, setCopied] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'history' | 'canvas' | 'traits' | 'activity'>('overview');
-  const timeline = normie ? getNormieTimeline(normie.id) : [];
+  const timeline = normie ? getNormieTimeline(normie.id, normie.owner) : [];
 
   const handleCopy = () => {
     if (!normie) return;
@@ -28,6 +36,13 @@ export default function NormieDetailDrawer({ normie, onClose }: NormieDetailDraw
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  const indexerNodeId = normie ? (parseInt(normie.id) % 12) + 1 : 1;
+  const coordX = normie ? (parseInt(normie.id) * 3) % 32 || 12 : 12;
+  const coordY = normie ? (parseInt(normie.id) * 7) % 32 || 18 : 18;
+  const pixelColor = normie ? '#' + ((parseInt(normie.id) * 12345) % 16777215 || 0x3b82f6).toString(16).padStart(6, '0').toUpperCase() : '#3B82F6';
+  const overlaidTrait = normie ? (normie.traits.find(t => t.trait_type !== 'Type' && t.trait_type !== 'Background')?.value || normie.traits[0]?.value || 'Original') : 'Original';
+  const metadataBlock = normie ? 20240198 + parseInt(normie.id) * 3 : 20240198;
 
   // Close on ESC keypress
   useEffect(() => {
@@ -41,10 +56,10 @@ export default function NormieDetailDrawer({ normie, onClose }: NormieDetailDraw
   if (!normie) return null;
 
   const statusColorMap = {
-    Active: { bg: 'bg-emerald-500/10', text: 'text-emerald-500', border: 'border-emerald-500/20' },
-    Zombie: { bg: 'bg-amber-500/10', text: 'text-amber-500', border: 'border-amber-500/20' },
-    Legendary: { bg: 'bg-purple-500/10', text: 'text-purple-500', border: 'border-purple-500/20' },
-    Burned: { bg: 'bg-red-500/10', text: 'text-red-500', border: 'border-red-500/20' },
+    Active: { bg: 'bg-emerald-500/10', text: 'text-emerald-500', border: 'border-emerald-500/20', dot: 'bg-emerald-500', label: 'Active on-chain' },
+    Zombie: { bg: 'bg-amber-500/10', text: 'text-amber-500', border: 'border-amber-500/20', dot: 'bg-amber-500', label: 'Zombie conversion' },
+    Legendary: { bg: 'bg-purple-500/10', text: 'text-purple-500', border: 'border-purple-500/20', dot: 'bg-purple-500', label: 'Legendary aura sync' },
+    Burned: { bg: 'bg-red-500/10', text: 'text-red-500', border: 'border-red-500/20', dot: 'bg-red-500', label: 'Ecosystem burned' },
   };
 
   const statusStyle = statusColorMap[normie.status] || statusColorMap.Active;
@@ -137,12 +152,12 @@ export default function NormieDetailDrawer({ normie, onClose }: NormieDetailDraw
                     </button>
                   </div>
                   <a 
-                    href={`https://basescan.org/nft/0x4016a1E2beC70BBAfA0F1cb6982E475f429B51E0/${normie.id}`} 
+                    href={`https://etherscan.io/nft/0x9eb6e2025b64f340691e424b7fe7022ffde12438/${normie.id}`} 
                     target="_blank" 
                     rel="noreferrer" 
                     className="text-[9px] text-zinc-400 hover:text-white font-mono flex items-center gap-1 mt-2.5 w-fit hover:underline"
                   >
-                    <span>Basescan Verification</span>
+                    <span>On-Chain Verification</span>
                     <ExternalLink className="w-2.5 h-2.5" />
                   </a>
                 </div>
@@ -178,21 +193,21 @@ export default function NormieDetailDrawer({ normie, onClose }: NormieDetailDraw
                     <div className="grid grid-cols-2 gap-4">
                       <div className="bg-[#111113]/40 border border-zinc-800/80 p-3.5 rounded-lg">
                         <span className="block text-[8px] font-mono text-zinc-500 uppercase">Ecosystem Status</span>
-                        <span className="text-xs font-semibold text-emerald-400 mt-1 block flex items-center gap-1.5">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                          <span>Alive on-chain</span>
+                        <span className={`text-xs font-semibold ${statusStyle.text} mt-1 block flex items-center gap-1.5`}>
+                          <span className={`w-1.5 h-1.5 rounded-full ${statusStyle.dot} animate-pulse`} />
+                          <span>{statusStyle.label}</span>
                         </span>
                       </div>
                       <div className="bg-[#111113]/40 border border-zinc-800/80 p-3.5 rounded-lg">
                         <span className="block text-[8px] font-mono text-zinc-500 uppercase">Indexing Node</span>
-                        <span className="text-xs font-semibold text-white mt-1 block font-mono">Ponder Node #01</span>
+                        <span className="text-xs font-semibold text-white mt-1 block font-mono">Ponder Node #{indexerNodeId}</span>
                       </div>
                     </div>
 
                     <div className="space-y-2">
                       <h4 className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">About this Entity</h4>
                       <p className="text-xs text-zinc-300 leading-relaxed font-sans">
-                        This Normie metadata package is indexed from ERC-721C contract. The pixel map records represent the history of canvas modifications and transform actions logged across Ponder indexer nodes.
+                        This Normie #{normie.id} ({normie.name}) metadata package is indexed from the Ethereum ERC-721 contract. The pixel map records represent the history of canvas modifications, active level {normie.level} states, and dynamic transform actions logged across Ponder indexer nodes.
                       </p>
                     </div>
 
@@ -241,7 +256,7 @@ export default function NormieDetailDrawer({ normie, onClose }: NormieDetailDraw
                       <Grid className="w-8 h-8 text-emerald-500" />
                       <div>
                         <h4 className="text-xs font-bold text-white font-sans">Canvas State Map</h4>
-                        <p className="text-[10px] text-zinc-400 font-mono mt-1">Entity has active canvas overrides registered under 0x6495...869c.</p>
+                        <p className="text-[10px] text-zinc-400 font-mono mt-1">Entity has active canvas overrides registered under {displayAddress(normie.owner)}.</p>
                       </div>
                     </div>
 
@@ -249,11 +264,11 @@ export default function NormieDetailDrawer({ normie, onClose }: NormieDetailDraw
                       <h4 className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Recent Pixel Transforms</h4>
                       <div className="space-y-2 bg-[#111113]/20 border border-zinc-800/80 rounded-lg p-3 divide-y divide-zinc-800/40">
                         <div className="py-2 flex items-center justify-between text-[11px] font-mono">
-                          <span className="text-zinc-300">Set Pixel at (14, 28) to #FF00FF</span>
+                          <span className="text-zinc-300">Set Pixel at ({coordX}, {coordY}) to {pixelColor}</span>
                           <span className="text-zinc-500">2 days ago</span>
                         </div>
                         <div className="py-2 flex items-center justify-between text-[11px] font-mono">
-                          <span className="text-zinc-300">Overlaid attribute: Cowboy Hat</span>
+                          <span className="text-zinc-300">Overlaid attribute: {overlaidTrait}</span>
                           <span className="text-zinc-500">1 week ago</span>
                         </div>
                         <div className="py-2 flex items-center justify-between text-[11px] font-mono">
@@ -293,11 +308,13 @@ export default function NormieDetailDrawer({ normie, onClose }: NormieDetailDraw
                     <div className="space-y-2 font-mono text-[11px]">
                       <div className="bg-[#111113]/30 border border-zinc-800/40 p-2.5 rounded flex items-center gap-2">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                        <span className="text-zinc-400">SYNC_OK: Parsed metadata block #20240198</span>
+                        <span className="text-zinc-400">SYNC_OK: Parsed metadata block #{metadataBlock}</span>
                       </div>
                       <div className="bg-[#111113]/30 border border-zinc-800/40 p-2.5 rounded flex items-center gap-2">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                        <span className="text-zinc-400">EVENT_EMIT: Registered level change {normie.level - 2} -&gt; {normie.level}</span>
+                        <span className="text-zinc-400">
+                          EVENT_EMIT: Registered level change {normie.level > 1 ? `${normie.level - 1} -> ${normie.level}` : `initialized at level 1`}
+                        </span>
                       </div>
                       <div className="bg-[#111113]/30 border border-zinc-800/40 p-2.5 rounded flex items-center gap-2">
                         <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />

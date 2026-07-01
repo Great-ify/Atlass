@@ -125,14 +125,17 @@ export default function GlobeAnimation() {
 
         if (statsRes.ok) {
           const stats = await statsRes.json();
-          if (stats.totalSupply) total = stats.totalSupply.toLocaleString();
-          if (stats.burnedCount !== undefined) burned = stats.burnedCount.toLocaleString();
+          if (stats.supply !== undefined) total = stats.supply.toLocaleString();
+          else if (stats.totalSupply) total = stats.totalSupply.toLocaleString();
+          
+          if (stats.burned !== undefined) burned = stats.burned.toLocaleString();
+          else if (stats.burnedCount !== undefined) burned = stats.burnedCount.toLocaleString();
           else if (stats.burnCount !== undefined) burned = stats.burnCount.toLocaleString();
         }
 
         if (histStatsRes.ok) {
           const hStats = await histStatsRes.json();
-          const transfersCount = hStats.transfers ?? hStats.transferCount ?? 6781;
+          const transfersCount = hStats.totalBurnCommitments ?? hStats.transfers ?? hStats.transferCount ?? 6781;
           transferred = transfersCount.toLocaleString();
         }
 
@@ -188,7 +191,7 @@ export default function GlobeAnimation() {
           });
         });
       } catch (err) {
-        console.error('Failed to load dynamic sphere live details:', err);
+        console.warn('Failed to load dynamic sphere live details:', err);
       }
     }
 

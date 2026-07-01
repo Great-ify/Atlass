@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Search, Compass, TrendingUp, X, CornerDownLeft, Command, Skull, Shield, Loader2 } from 'lucide-react';
 import { NormieItem } from '../types';
-import { INITIAL_NORMIES, fetchRealNormies, fetchNormieDetail } from '../data';
+import { fetchRealNormies, fetchNormieDetail } from '../data';
 import { usePrivy } from '../lib/privy';
 
 interface SearchModalProps {

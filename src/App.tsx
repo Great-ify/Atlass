@@ -3,12 +3,11 @@ import { motion, AnimatePresence } from 'motion/react';
 import { 
   Search, Compass, Activity, Shield, Flame, User, Clock, TrendingUp, Eye, 
   Layers, Database, ArrowRight, ArrowUp, ArrowDown, Star, Skull, Sparkles, 
-  GitBranch, Wallet, Check, ChevronRight, CornerDownLeft, Command, Info,
-  Hexagon, ArrowUpRight, Bell, History, Pencil, ArrowLeftRight, LogOut
+  Hexagon, ArrowUpRight, Bell, History, Pencil, ArrowLeftRight, LogOut, Command, Wallet, Check
 } from 'lucide-react';
 
 import { ActivityEvent, MetricItem, NormieItem } from './types';
-import { INITIAL_NORMIES, INITIAL_ACTIVITIES, INITIAL_METRICS, FEATURES, generateRandomEvent, getNormieById, fetchLiveMetrics, fetchCustomizedEvents } from './data';
+import { FEATURES, fetchLiveMetrics, fetchCustomizedEvents } from './data';
 
 import GlobeAnimation from './components/GlobeAnimation';
 import Sparkline from './components/Sparkline';
@@ -52,8 +51,8 @@ export default function App() {
   const [subscribing, setSubscribing] = useState(false);
 
   // Dynamic ticking activity feeds on Landing Page
-  const [liveActivities, setLiveActivities] = useState<ActivityEvent[]>(INITIAL_ACTIVITIES);
-  const [liveMetrics, setLiveMetrics] = useState<MetricItem[]>(INITIAL_METRICS);
+  const [liveActivities, setLiveActivities] = useState<ActivityEvent[]>([]);
+  const [liveMetrics, setLiveMetrics] = useState<MetricItem[]>([]);
 
   // Notification Banner
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -81,7 +80,7 @@ export default function App() {
         setLiveActivities(liveAct.slice(0, 5));
         setLiveMetrics(liveMet.slice(0, 6));
       } catch (err) {
-        console.error('Failed to load landing data:', err);
+        console.warn('Failed to load landing data:', err);
       }
     }
 

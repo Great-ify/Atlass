@@ -52,3 +52,10 @@ export interface TimelineItem {
   hash: string;
   by: string;
 }
+
+export interface TraitStatItem {
+  id: string;
+  name: string;
+  category: string;
+  percentage: number;
+}

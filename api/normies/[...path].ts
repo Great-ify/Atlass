@@ -2,21 +2,29 @@ import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { Buffer } from 'buffer';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  // Add basic CORS headers for maximum resilience
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Accept');
+
+  if (req.method === 'OPTIONS') {
+    res.status(200).end();
+    return;
+  }
+
   if (req.method !== 'GET') {
     res.status(405).json({ error: 'Method not allowed' });
     return;
   }
 
-  const { path, ...query } = req.query;
-  const apiPath = Array.isArray(path) ? path.join('/') : (path ?? '');
-
-  const queryString = new URLSearchParams(
-    Object.entries(query).flatMap(([key, value]) =>
-      Array.isArray(value) ? value.map(v => [key, v]) : [[key, value as string]]
-    )
-  ).toString();
-
-  const targetUrl = `https://api.normies.art/${apiPath}${queryString ? `?${queryString}` : ''}`;
+  // Parse the target subpath directly from req.url to bypass any dynamic route param parsing issues
+  const fullUrl = req.url ?? '';
+  const prefix = '/api/normies';
+  const index = fullUrl.indexOf(prefix);
+  const subPath = index !== -1 ? fullUrl.substring(index + prefix.length) : '';
+  
+  // Construct target URL ensuring clean slash separation
+  const targetUrl = `https://api.normies.art${subPath.startsWith('/') ? '' : '/'}${subPath}`;
 
   try {
     console.log(`[Proxy] Fetching on-chain data: ${targetUrl}`);
@@ -39,8 +47,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const contentType = response.headers.get('content-type') || '';
 
     // Cache at the edge briefly - matches the API's own short cache windows
-    // (most Normies endpoints are max-age=15-300s). Adjust per-route if you
-    // want to be more precise using the cache table in the API docs.
     res.setHeader('Cache-Control', 'public, max-age=15, s-maxage=30, stale-while-revalidate=120');
 
     if (contentType.includes('application/json')) {
@@ -58,3 +64,4 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     res.status(500).json({ error: error.message || 'Internal proxy error' });
   }
 }
+

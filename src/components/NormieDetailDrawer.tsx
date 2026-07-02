@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, ExternalLink, Copy, Check, Shield, Layers, Calendar, User, Zap, Activity, Grid } from 'lucide-react';
 import { NormieItem } from '../types';
-import { getNormieTimeline } from '../data';
+import { fetchNormieVersions, fetchNormieCanvasDiff, fetchZombieTokenHistory, NormieVersion, CanvasDiff, ZombieConversion } from '../data';
 import { usePrivy } from '../lib/privy';
 
 interface NormieDetailDrawerProps {
@@ -28,7 +28,39 @@ export default function NormieDetailDrawer({ normie, onClose }: NormieDetailDraw
 
   const [copied, setCopied] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'history' | 'canvas' | 'traits' | 'activity'>('overview');
-  const timeline = normie ? getNormieTimeline(normie.id, normie.owner) : [];
+
+  const [versions, setVersions] = useState<NormieVersion[]>([]);
+  const [canvasDiff, setCanvasDiff] = useState<CanvasDiff | null>(null);
+  const [zombieHistory, setZombieHistory] = useState<ZombieConversion[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!normie) return;
+    let active = true;
+    async function loadAll() {
+      setLoading(true);
+      try {
+        const [vData, cData, zData] = await Promise.all([
+          fetchNormieVersions(normie.id),
+          fetchNormieCanvasDiff(normie.id),
+          normie.status === 'Zombie' ? fetchZombieTokenHistory(normie.id) : Promise.resolve([])
+        ]);
+        if (active) {
+          setVersions(vData);
+          setCanvasDiff(cData);
+          setZombieHistory(zData);
+        }
+      } catch (err) {
+        console.warn('Error fetching detail drawer active data:', err);
+      } finally {
+        if (active) setLoading(false);
+      }
+    }
+    loadAll();
+    return () => {
+      active = false;
+    };
+  }, [normie?.id, normie?.status]);
 
   const handleCopy = () => {
     if (!normie) return;
@@ -37,12 +69,26 @@ export default function NormieDetailDrawer({ normie, onClose }: NormieDetailDraw
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const indexerNodeId = normie ? (parseInt(normie.id) % 12) + 1 : 1;
-  const coordX = normie ? (parseInt(normie.id) * 3) % 32 || 12 : 12;
-  const coordY = normie ? (parseInt(normie.id) * 7) % 32 || 18 : 18;
-  const pixelColor = normie ? '#' + ((parseInt(normie.id) * 12345) % 16777215 || 0x3b82f6).toString(16).padStart(6, '0').toUpperCase() : '#3B82F6';
-  const overlaidTrait = normie ? (normie.traits.find(t => t.trait_type !== 'Type' && t.trait_type !== 'Background')?.value || normie.traits[0]?.value || 'Original') : 'Original';
-  const metadataBlock = normie ? 20240198 + parseInt(normie.id) * 3 : 20240198;
+  const formatTime = (ts: any) => {
+    if (!ts) return 'Unknown';
+    const num = parseInt(ts);
+    if (isNaN(num)) return ts.toString();
+    const ms = num < 3000000000 ? num * 1000 : num;
+    return new Date(ms).toLocaleString();
+  };
+
+  const getRelativeTime = (ts: any) => {
+    if (!ts) return '—';
+    const num = parseInt(ts);
+    if (isNaN(num)) return ts.toString();
+    const ms = num < 3000000000 ? num * 1000 : num;
+    const secondsAgo = Math.floor((Date.now() - ms) / 1000);
+    if (secondsAgo < 0) return 'Just now';
+    if (secondsAgo < 60) return `${secondsAgo}s ago`;
+    if (secondsAgo < 3600) return `${Math.floor(secondsAgo / 60)}m ago`;
+    if (secondsAgo < 86400) return `${Math.floor(secondsAgo / 3600)}h ago`;
+    return `${Math.floor(secondsAgo / 86400)}d ago`;
+  };
 
   // Close on ESC keypress
   useEffect(() => {
@@ -88,8 +134,8 @@ export default function NormieDetailDrawer({ normie, onClose }: NormieDetailDraw
           {/* Top Panel Header */}
           <div className="h-16 border-b border-zinc-800/80 flex items-center justify-between px-6 shrink-0 bg-[#0c0c0e]">
             <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-400">Ecosystem Intelligence Node</span>
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" />
+              <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-400">Normie Details</span>
             </div>
             
             <button 
@@ -199,8 +245,8 @@ export default function NormieDetailDrawer({ normie, onClose }: NormieDetailDraw
                         </span>
                       </div>
                       <div className="bg-[#111113]/40 border border-zinc-800/80 p-3.5 rounded-lg">
-                        <span className="block text-[8px] font-mono text-zinc-500 uppercase">Indexing Node</span>
-                        <span className="text-xs font-semibold text-white mt-1 block font-mono">Ponder Node #{indexerNodeId}</span>
+                        <span className="block text-[8px] font-mono text-zinc-500 uppercase">Indexing Status</span>
+                        <span className="text-xs font-semibold text-emerald-500 mt-1 block font-mono">Sync Complete</span>
                       </div>
                     </div>
 
@@ -230,22 +276,32 @@ export default function NormieDetailDrawer({ normie, onClose }: NormieDetailDraw
                 {activeTab === 'history' && (
                   <div className="space-y-4">
                     <h4 className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest mb-4">Provenance Registry</h4>
-                    <div className="relative pl-4 border-l border-zinc-800 space-y-6">
-                      {timeline.map((item, idx) => (
-                        <div key={item.id} className="relative">
-                          <span className="absolute -left-[21px] top-1.5 w-2.5 h-2.5 rounded-full border border-zinc-800 bg-[#09090B]" />
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-xs font-sans font-semibold text-white">{item.event}</span>
-                            <span className="text-[9px] font-mono text-zinc-500">{item.date}</span>
+                    {loading ? (
+                      <div className="text-xs font-mono text-zinc-500 animate-pulse">Loading provenance records...</div>
+                    ) : versions.length === 0 ? (
+                      <div className="text-xs font-mono text-zinc-500">No provenance versions indexed on-chain.</div>
+                    ) : (
+                      <div className="relative pl-4 border-l border-zinc-800 space-y-6">
+                        {versions.map((version, idx) => (
+                          <div key={idx} className="relative">
+                            <span className="absolute -left-[21px] top-1.5 w-2.5 h-2.5 rounded-full border border-zinc-800 bg-[#09090B]" />
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="text-xs font-sans font-semibold text-white">
+                                {idx === versions.length - 1 ? 'Original Mint' : `Canvas customized`}
+                              </span>
+                              <span className="text-[9px] font-mono text-zinc-500">{getRelativeTime(version.timestamp)}</span>
+                            </div>
+                            <div className="text-[10px] text-zinc-400 font-mono mt-1 flex flex-col gap-0.5">
+                              <span>Operator: {displayAddress(version.transformer)}</span>
+                              <span className="text-[9px] text-zinc-500 uppercase truncate">TX: {version.transactionHash || '—'}</span>
+                              {version.changeCount !== undefined && (
+                                <span className="text-[9px] text-zinc-500">Changes: {version.changeCount} pixels</span>
+                              )}
+                            </div>
                           </div>
-                          <div className="text-[10px] text-zinc-400 font-mono mt-1 flex items-center gap-1.5">
-                            <span>Operator: {item.by}</span>
-                            <span className="text-zinc-700">|</span>
-                            <span className="text-[9px] text-zinc-500 uppercase truncate">TX: {item.hash.substring(0, 10)}...</span>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -261,21 +317,29 @@ export default function NormieDetailDrawer({ normie, onClose }: NormieDetailDraw
                     </div>
 
                     <div className="space-y-3">
-                      <h4 className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Recent Pixel Transforms</h4>
-                      <div className="space-y-2 bg-[#111113]/20 border border-zinc-800/80 rounded-lg p-3 divide-y divide-zinc-800/40">
-                        <div className="py-2 flex items-center justify-between text-[11px] font-mono">
-                          <span className="text-zinc-300">Set Pixel at ({coordX}, {coordY}) to {pixelColor}</span>
-                          <span className="text-zinc-500">2 days ago</span>
+                      <h4 className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Pixel Transform Stats</h4>
+                      {loading ? (
+                        <div className="text-xs font-mono text-zinc-500 animate-pulse">Loading canvas stats...</div>
+                      ) : canvasDiff ? (
+                        <div className="grid grid-cols-3 gap-2.5">
+                          <div className="bg-[#111113]/50 border border-zinc-800/50 p-3 rounded-lg text-center">
+                            <span className="text-[8px] font-mono text-zinc-500 uppercase block">Added</span>
+                            <span className="text-sm font-bold font-mono text-emerald-400 mt-1 block">+{canvasDiff.added}</span>
+                          </div>
+                          <div className="bg-[#111113]/50 border border-zinc-800/50 p-3 rounded-lg text-center">
+                            <span className="text-[8px] font-mono text-zinc-500 uppercase block">Removed</span>
+                            <span className="text-sm font-bold font-mono text-red-400 mt-1 block">-{canvasDiff.removed}</span>
+                          </div>
+                          <div className="bg-[#111113]/50 border border-zinc-800/50 p-3 rounded-lg text-center">
+                            <span className="text-[8px] font-mono text-zinc-500 uppercase block">Net Change</span>
+                            <span className="text-sm font-bold font-mono text-white mt-1 block">
+                              {canvasDiff.net > 0 ? `+${canvasDiff.net}` : canvasDiff.net}
+                            </span>
+                          </div>
                         </div>
-                        <div className="py-2 flex items-center justify-between text-[11px] font-mono">
-                          <span className="text-zinc-300">Overlaid attribute: {overlaidTrait}</span>
-                          <span className="text-zinc-500">1 week ago</span>
-                        </div>
-                        <div className="py-2 flex items-center justify-between text-[11px] font-mono">
-                          <span className="text-zinc-300">Init canvas registration</span>
-                          <span className="text-zinc-500">1 month ago</span>
-                        </div>
-                      </div>
+                      ) : (
+                        <div className="text-xs font-mono text-zinc-500">No pixel transform stats available for this token.</div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -304,32 +368,60 @@ export default function NormieDetailDrawer({ normie, onClose }: NormieDetailDraw
                 {/* TAB 5: RECENT LOGS */}
                 {activeTab === 'activity' && (
                   <div className="space-y-4">
-                    <h4 className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Recent Node Operations</h4>
-                    <div className="space-y-2 font-mono text-[11px]">
-                      <div className="bg-[#111113]/30 border border-zinc-800/40 p-2.5 rounded flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                        <span className="text-zinc-400">SYNC_OK: Parsed metadata block #{metadataBlock}</span>
-                      </div>
-                      <div className="bg-[#111113]/30 border border-zinc-800/40 p-2.5 rounded flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                        <span className="text-zinc-400">
-                          EVENT_EMIT: Registered level change {normie.level > 1 ? `${normie.level - 1} -> ${normie.level}` : `initialized at level 1`}
-                        </span>
-                      </div>
-                      <div className="bg-[#111113]/30 border border-zinc-800/40 p-2.5 rounded flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-blue-500" />
-                        <span className="text-zinc-400">INDEXER_UPDATE: Decoded traits checksum verification OK</span>
-                      </div>
-                    </div>
+                    <h4 className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Recent On-Chain Activity</h4>
+                    {loading ? (
+                      <div className="text-xs font-mono text-zinc-500 animate-pulse">Loading activity logs...</div>
+                    ) : (
+                      (() => {
+                        const blendedActivities = [
+                          ...versions.map(v => ({
+                            type: 'canvas_updated',
+                            title: 'Canvas Customized',
+                            timestamp: typeof v.timestamp === 'string' ? parseInt(v.timestamp) : v.timestamp,
+                            address: v.transformer,
+                            hash: v.transactionHash,
+                            details: v.changeCount !== undefined ? `Modified ${v.changeCount} pixels` : 'Customized canvas'
+                          })),
+                          ...zombieHistory.map(z => ({
+                            type: 'zombie_conversion',
+                            title: 'Zombie Conversion',
+                            timestamp: typeof z.timestamp === 'string' ? parseInt(z.timestamp) : z.timestamp,
+                            address: z.transformer,
+                            hash: z.transactionHash,
+                            details: 'Infected by the zombie horde'
+                          }))
+                        ].sort((a, b) => b.timestamp - a.timestamp);
+
+                        if (blendedActivities.length === 0) {
+                          return <div className="text-xs font-mono text-zinc-500">No on-chain activity indexed yet for this token.</div>;
+                        }
+
+                        return (
+                          <div className="space-y-2 font-mono text-[11px]">
+                            {blendedActivities.map((act, idx) => (
+                              <div key={idx} className="bg-[#111113]/30 border border-zinc-800/40 p-2.5 rounded flex flex-col gap-1">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-1.5">
+                                    <span className={`w-1.5 h-1.5 rounded-full ${act.type === 'zombie_conversion' ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`} />
+                                    <span className="text-white font-bold">{act.title}</span>
+                                  </div>
+                                  <span className="text-zinc-500 text-[10px]">{getRelativeTime(act.timestamp)}</span>
+                                </div>
+                                <span className="text-zinc-400">{act.details}</span>
+                                <div className="text-[9px] text-zinc-500 flex flex-wrap gap-x-2">
+                                  <span>By: {displayAddress(act.address)}</span>
+                                  <span>•</span>
+                                  <span className="truncate max-w-[200px]" title={act.hash}>TX: {act.hash || '—'}</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        );
+                      })()
+                    )}
                   </div>
                 )}
 
-              </div>
-
-              {/* Bottom footer */}
-              <div className="mt-auto pt-4 border-t border-zinc-800/80 flex items-center justify-between text-[8px] font-mono text-zinc-500 shrink-0">
-                <span>INDEXED_RECORD_ACTIVE</span>
-                <span>ATLAS CORE V1.0.2</span>
               </div>
 
             </div>

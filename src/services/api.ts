@@ -29,11 +29,16 @@ export function mapApiNormieToItem(apiItem: any): NormieItem {
   const rank = apiItem.rank ?? apiItem.rarityRank ?? 0;
   const score = apiItem.score ?? apiItem.rarityScore ?? 0;
 
+  let owner = apiItem.owner ?? 'Unknown';
+  if (owner === '0x0000000000000000000000000000000000000000') {
+    owner = 'Unknown';
+  }
+
   return {
     id,
     name: apiItem.name ?? `Normie #${id}`,
     imageUrl: `${BASE_API_PATH}/normie/${id}/image.png`,
-    owner: apiItem.owner ?? '0x0000000000000000000000000000000000000000',
+    owner,
     level: apiItem.level ?? apiItem.canvasLevel ?? 1,
     status,
     updatedAt: apiItem.updatedAt ?? 'Recently',
@@ -44,29 +49,46 @@ export function mapApiNormieToItem(apiItem: any): NormieItem {
 }
 
 export async function fetchLiveMetrics(): Promise<MetricItem[]> {
+  let rarityStats: any = null;
+  let historyStats: any = null;
+
   try {
-    const [rarityStats, historyStats] = await Promise.all([
-      fetch(`${BASE_API_PATH}/rarity/stats`).then(res => res.json()),
-      fetch(`${BASE_API_PATH}/history/stats`).then(res => res.json())
-    ]);
-
-    const canvasCount = historyStats?.totalTransforms ?? historyStats?.canvas ?? historyStats?.canvasCount ?? historyStats?.canvasUpdates ?? 0;
-    const zombiesCount = historyStats?.totalZombies ?? rarityStats?.zombiesCount ?? rarityStats?.zombieCount ?? rarityStats?.zombies ?? 0;
-    const transfersCount = historyStats?.totalBurnCommitments ?? historyStats?.transfers ?? historyStats?.transferCount ?? 0;
-    const legendaryCount = historyStats?.totalLegendaryCanvases ?? rarityStats?.legendaryCount ?? rarityStats?.legendary ?? 0;
-    const burnedCount = rarityStats?.burned ?? historyStats?.totalBurnedTokens ?? rarityStats?.burnedCount ?? rarityStats?.burnCount ?? 0;
-
-    return [
-      { id: 'canvas_updates', label: 'Canvas Updates', value: canvasCount.toLocaleString(), change: 'Live', isPositive: true, color: 'success', sparklineData: [30, 32, 35, 38, 42, 45, 48, 52, 55, 58] },
-      { id: 'zombie_conversions', label: 'Zombie Conversions', value: zombiesCount.toLocaleString(), change: 'Live', isPositive: true, color: 'legendary', sparklineData: [15, 18, 22, 20, 24, 28, 30, 32, 35, 38] },
-      { id: 'normies_transferred', label: 'Normies Transferred', value: transfersCount.toLocaleString(), change: 'Live', isPositive: true, color: 'info', sparklineData: [50, 45, 48, 55, 60, 58, 65, 70, 75, 80] },
-      { id: 'legendary_acquired', label: 'Legendary Acquired', value: legendaryCount.toLocaleString(), change: 'Live', isPositive: true, color: 'warning', sparklineData: [10, 12, 14, 15, 18, 20, 22, 24, 26, 28] },
-      { id: 'normies_burned', label: 'Normies Burned', value: burnedCount.toLocaleString(), change: 'Live', isPositive: true, color: 'error', sparklineData: [15, 12, 18, 14, 16, 22, 19, 21, 24, 28] }
-    ];
+    const res = await fetch(`${BASE_API_PATH}/rarity/stats`);
+    if (res.ok) {
+      rarityStats = await res.json();
+    } else {
+      console.warn(`[API] /rarity/stats returned status: ${res.status}`);
+    }
   } catch (err) {
-    console.warn('Failed to compile live metrics:', err);
-    return [];
+    console.warn('Failed to fetch /rarity/stats:', err);
   }
+
+  try {
+    const res = await fetch(`${BASE_API_PATH}/history/stats`);
+    if (res.ok) {
+      historyStats = await res.json();
+    } else {
+      console.warn(`[API] /history/stats returned status: ${res.status}`);
+    }
+  } catch (err) {
+    console.warn('Failed to fetch /history/stats:', err);
+  }
+
+  const supplyCount = rarityStats?.supply ?? 0;
+  const canvasCount = historyStats?.totalTransforms ?? 0;
+  const zombiesCount = historyStats?.totalZombies ?? 0;
+  const transfersCount = historyStats?.totalBurnCommitments ?? 0;
+  const legendaryCount = historyStats?.totalLegendaryCanvases ?? 0;
+  const burnedCount = rarityStats?.burned ?? historyStats?.totalBurnedTokens ?? 0;
+
+  return [
+    { id: 'total_normies', label: 'Total Normies', value: supplyCount > 0 ? supplyCount.toLocaleString() : '0', color: 'legendary' },
+    { id: 'canvas_updates', label: 'Canvas Updates', value: canvasCount > 0 ? canvasCount.toLocaleString() : '0', color: 'success' },
+    { id: 'zombie_conversions', label: 'Zombie Conversions', value: zombiesCount > 0 ? zombiesCount.toLocaleString() : '0', color: 'legendary' },
+    { id: 'normies_transferred', label: 'Normies Transferred', value: transfersCount > 0 ? transfersCount.toLocaleString() : '0', color: 'info' },
+    { id: 'legendary_acquired', label: 'Legendary Acquired', value: legendaryCount > 0 ? legendaryCount.toLocaleString() : '0', color: 'warning' },
+    { id: 'normies_burned', label: 'Normies Burned', value: burnedCount > 0 ? burnedCount.toLocaleString() : '0', color: 'error' }
+  ];
 }
 
 export async function fetchCustomizedEvents(limit = 15): Promise<ActivityEvent[]> {
@@ -112,23 +134,32 @@ export async function fetchRealNormies(params: {
   search?: string;
   page?: number;
 } = {}): Promise<NormieItem[]> {
-  try {
+  const tryFetch = async (sortVal?: string): Promise<NormieItem[]> => {
     const query = new URLSearchParams();
     if (params.limit) query.append('limit', params.limit.toString());
-    if (params.sort) query.append('sort', params.sort);
+    if (sortVal) query.append('sort', sortVal);
     if (params.order) query.append('order', params.order);
     if (params.search) query.append('q', params.search); // Searching using 'q' as per API docs
     if (params.page) query.append('page', params.page.toString());
 
     const res = await fetch(`${BASE_API_PATH}/rarity/normies?${query.toString()}`);
-    if (!res.ok) throw new Error('API error');
+    if (!res.ok) throw new Error(`API error ${res.status}`);
     const data = await res.json();
     
     const list = Array.isArray(data) ? data : (data.items || data.normies || data.data || []);
     return list.map((item: any) => mapApiNormieToItem(item));
+  };
+
+  try {
+    return await tryFetch(params.sort);
   } catch (err) {
-    console.warn('Failed to fetch real normies list:', err);
-    return [];
+    console.warn(`Failed to fetch real normies with sort: ${params.sort}, retrying with rank fallback:`, err);
+    try {
+      return await tryFetch('rank');
+    } catch (retryErr) {
+      console.warn('Fallback fetch also failed:', retryErr);
+      return [];
+    }
   }
 }
 
@@ -149,60 +180,71 @@ export async function fetchNormieDetail(id: string): Promise<NormieItem | null> 
   }
 }
 
-// Generate single Normie object on the fly as backup
-export async function getNormieById(id: string): Promise<NormieItem | null> {
-  // Try fetching real data first
+export async function getNormieById(id: string): Promise<NormieItem> {
   const normie = await fetchNormieDetail(id);
-  if (normie) return normie;
-
-  // Fallback to minimal data
-  return {
-    id,
-    name: `Normie #${id}`,
-    imageUrl: `${BASE_API_PATH}/normie/${id}/image.png`,
-    owner: '0x0000000000000000000000000000000000000000',
-    level: 1,
-    status: 'Active',
-    updatedAt: 'Recently',
-    score: 0,
-    rank: 0,
-    traits: []
-  };
+  if (!normie) {
+    throw new Error(`Normie #${id} not found on-chain.`);
+  }
+  return normie;
 }
 
-// Generate complete timeline for a Normie
-export function getNormieTimeline(id: string, owner?: string): TimelineItem[] {
-  const seed = parseInt(id) || 123;
-  // Generate deterministic but unique-looking hashes for each normie ID
-  const hash1 = '0x' + Array.from({ length: 64 }, (_, i) => ((seed * (i + 13)) % 16).toString(16)).join('');
-  const hash2 = '0x' + Array.from({ length: 64 }, (_, i) => (((seed + 456) * (i + 7)) % 16).toString(16)).join('');
-  const hash3 = '0x' + Array.from({ length: 64 }, (_, i) => (((seed + 789) * (i + 31)) % 16).toString(16)).join('');
+export interface NormieVersion {
+  transformer: string;
+  timestamp: string | number;
+  transactionHash: string;
+  changeCount?: number;
+}
 
-  const displayOwner = owner && owner.length > 10 ? `${owner.slice(0, 6)}...${owner.slice(-4)}` : (owner || 'Vault');
+export interface CanvasDiff {
+  added: number;
+  removed: number;
+  net: number;
+}
 
-  return [
-    {
-      id: 't1',
-      event: 'Metadata updated on-chain',
-      date: 'Live Sync',
-      hash: hash1,
-      by: 'Atlas Indexer'
-    },
-    {
-      id: 't2',
-      event: 'Transferred to current vault',
-      date: 'On-Chain',
-      hash: hash2,
-      by: `Vault ${displayOwner}`
-    },
-    {
-      id: 't3',
-      event: 'Minted on Ethereum Network',
-      date: 'Original Mint',
-      hash: hash3,
-      by: 'Normies Contract'
-    }
-  ];
+export interface ZombieConversion {
+  timestamp: string | number;
+  transformer: string;
+  transactionHash: string;
+}
+
+export async function fetchNormieVersions(id: string): Promise<NormieVersion[]> {
+  try {
+    const res = await fetch(`${BASE_API_PATH}/history/normie/${id}/versions`);
+    if (!res.ok) throw new Error(`Status ${res.status}`);
+    const data = await res.json();
+    return Array.isArray(data) ? data : (data.versions || data.data || []);
+  } catch (err) {
+    console.warn(`Failed to fetch versions for normie #${id}:`, err);
+    return [];
+  }
+}
+
+export async function fetchNormieCanvasDiff(id: string): Promise<CanvasDiff | null> {
+  try {
+    const res = await fetch(`${BASE_API_PATH}/normie/${id}/canvas/diff`);
+    if (!res.ok) throw new Error(`Status ${res.status}`);
+    const data = await res.json();
+    return {
+      added: data.added ?? data.addedCount ?? 0,
+      removed: data.removed ?? data.removedCount ?? 0,
+      net: data.net ?? data.netChange ?? 0
+    };
+  } catch (err) {
+    console.warn(`Failed to fetch canvas diff for normie #${id}:`, err);
+    return null;
+  }
+}
+
+export async function fetchZombieTokenHistory(id: string): Promise<ZombieConversion[]> {
+  try {
+    const res = await fetch(`${BASE_API_PATH}/zombies/token/${id}`);
+    if (!res.ok) throw new Error(`Status ${res.status}`);
+    const data = await res.json();
+    return Array.isArray(data) ? data : (data.conversions || data.history || data.data ? (data.data || []) : []);
+  } catch (err) {
+    console.warn(`Failed to fetch zombie history for token #${id}:`, err);
+    return [];
+  }
 }
 
 export async function fetchTopTraits(): Promise<TraitStatItem[]> {
@@ -246,18 +288,47 @@ export async function fetchTopTraits(): Promise<TraitStatItem[]> {
     traitList.sort((a, b) => b.percentage - a.percentage);
     
     if (traitList.length === 0) {
-      return [
-        { id: '1', name: 'Alien', category: 'Type', percentage: 24.6 },
-        { id: '2', name: 'Cowboy Hat', category: 'Accessory', percentage: 18.3 },
-        { id: '3', name: 'Sunglasses', category: 'Eyes', percentage: 14.7 },
-        { id: '4', name: 'Classic Shades', category: 'Eyes', percentage: 11.2 },
-        { id: '5', name: 'Full Beard', category: 'Facial Feature', percentage: 8.9 }
-      ];
+      return [];
     }
     
     return traitList.slice(0, 5);
   } catch (err) {
     console.warn('Failed to fetch top traits:', err);
+    return [];
+  }
+}
+
+export async function fetchZombieConversions(limit = 15): Promise<ActivityEvent[]> {
+  try {
+    const res = await fetch(`${BASE_API_PATH}/zombies/conversions?limit=${limit}`);
+    if (!res.ok) throw new Error(`Status ${res.status}`);
+    const data = await res.json();
+    const list = Array.isArray(data) ? data : (data.conversions || data.data || []);
+    return list.map((apiEvent: any, index: number) => {
+      const normieId = (apiEvent.tokenId ?? apiEvent.id ?? '0').toString();
+      const transformer = apiEvent.transformer ?? apiEvent.wallet ?? 'Unknown';
+      const timestamp = apiEvent.timestamp ? parseInt(apiEvent.timestamp) * 1000 : Date.now() - index * 120000;
+      
+      const secondsAgo = Math.floor((Date.now() - timestamp) / 1000);
+      let timeAgo = 'Just now';
+      if (secondsAgo >= 86400) timeAgo = `${Math.floor(secondsAgo / 86400)}d ago`;
+      else if (secondsAgo >= 3600) timeAgo = `${Math.floor(secondsAgo / 3600)}h ago`;
+      else if (secondsAgo >= 60) timeAgo = `${Math.floor(secondsAgo / 60)}m ago`;
+      else if (secondsAgo > 10) timeAgo = `${secondsAgo}s ago`;
+
+      return {
+        id: apiEvent.id?.toString() ?? `zombie_act_${index}`,
+        type: 'zombie_conversion' as const,
+        title: 'Zombie conversion',
+        normieName: `Normie #${normieId}`,
+        normieId,
+        userAddress: transformer,
+        timeAgo,
+        timestamp
+      };
+    });
+  } catch (err) {
+    console.warn('Failed to fetch zombie conversions:', err);
     return [];
   }
 }

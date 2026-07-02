@@ -10,7 +10,6 @@ import { ActivityEvent, MetricItem, NormieItem } from './types';
 import { FEATURES, fetchLiveMetrics, fetchCustomizedEvents } from './data';
 
 import GlobeAnimation from './components/GlobeAnimation';
-import Sparkline from './components/Sparkline';
 import SearchModal from './components/SearchModal';
 import NormieDetailDrawer from './components/NormieDetailDrawer';
 import AppDemoMode from './components/AppDemoMode';
@@ -509,8 +508,8 @@ export default function App() {
                     <div className="text-lg font-mono font-bold text-white mt-1.5">{m.value}</div>
                   </div>
                   
-                  {/* Embedded sparkline with corresponding hex color */}
-                  <div className="mt-5 flex items-end justify-between">
+                  {/* Status Indicator */}
+                  <div className="mt-5 flex items-center justify-between">
                     <span className={`text-[9px] font-mono font-semibold px-1.5 py-0.5 rounded ${
                       m.color === 'success' ? 'bg-emerald-500/10 text-emerald-400' :
                       m.color === 'warning' ? 'bg-amber-500/10 text-amber-400' :
@@ -521,11 +520,6 @@ export default function App() {
                     }`}>
                       {m.change}
                     </span>
-                    
-                    {/* Miniature canvas sparkline */}
-                    <div className="h-4.5 w-14 opacity-70 group-hover:opacity-100 transition-opacity">
-                      <Sparkline data={m.sparklineData} color={m.color as 'zinc' | 'success' | 'legendary' | 'info' | 'warning' | 'error'} width={56} height={18} />
-                    </div>
                   </div>
                 </motion.div>
               ));

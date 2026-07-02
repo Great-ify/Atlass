@@ -15,9 +15,9 @@ import {
   getNormieById,
   fetchTopTraits,
   TraitStatItem,
-  mapApiNormieToItem
+  mapApiNormieToItem,
+  fetchZombieConversions
 } from '../data';
-import Sparkline from './Sparkline';
 import { usePrivy } from '../lib/privy';
 
 interface AppDemoModeProps {
@@ -55,11 +55,6 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
       return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
     }
     return addr;
-  };
-
-  const getFallbackAddress = (id: string) => {
-    const seed = parseInt(id) || 12345;
-    return '0x' + Array.from({ length: 40 }, (_, i) => ((seed * (i + 17) + 5) % 16).toString(16)).join('');
   };
   
   // Real dynamic API states
@@ -133,21 +128,38 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
   // Watchlist filter tab: 'All' | 'Normies' | 'Wallets' | 'Searches'
   const [watchlistFilter, setWatchlistFilter] = useState<string>('All');
 
+  // Sync status tracking
+  const [lastSyncedAt, setLastSyncedAt] = useState<number>(Date.now());
+  const [syncedAgoText, setSyncedAgoText] = useState<string>('Just now');
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const diffSecs = Math.floor((Date.now() - lastSyncedAt) / 1000);
+      if (diffSecs < 1) {
+        setSyncedAgoText('Just now');
+      } else if (diffSecs < 60) {
+        setSyncedAgoText(`${diffSecs}s ago`);
+      } else {
+        const mins = Math.floor(diffSecs / 60);
+        setSyncedAgoText(`${mins}m ${diffSecs % 60}s ago`);
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [lastSyncedAt]);
+
   // Watchlist state
   const [watchlist, setWatchlist] = useState<NormieItem[]>([]);
-
-  // Current block tracker
-  const [currentBlock, setCurrentBlock] = useState(20240154);
 
   // Load main dashboard metrics and feeds
   const loadDashboardData = async () => {
     try {
-      const [liveAct, liveMet, liveNor, liveRec, liveTraits] = await Promise.all([
+      const [liveAct, liveMet, liveNor, liveRec, liveTraits, realZombieConvs] = await Promise.all([
         fetchCustomizedEvents(15),
         fetchLiveMetrics(),
         fetchRealNormies({ limit: 12, sort: 'rank', order: 'asc' }),
         fetchRealNormies({ limit: 4, sort: 'updatedAt', order: 'desc' }),
-        fetchTopTraits()
+        fetchTopTraits(),
+        fetchZombieConversions(15)
       ]);
 
       // Compile rich list of activities by blending different event states from live on-chain updates
@@ -161,37 +173,12 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
         });
       });
 
-      // Add Zombie conversions from the real live listings
-      const zombieList = liveNor.filter(n => n.status === 'Zombie');
-      zombieList.forEach((z, idx) => {
-        blendedEvents.push({
-          id: `z_conv_${z.id}_${idx}`,
-          type: 'zombie_conversion',
-          title: 'Zombie conversion',
-          normieName: `Normie #${z.id}`,
-          normieId: z.id,
-          userAddress: z.owner.length > 10 ? z.owner.slice(0, 6) + '...' + z.owner.slice(-4) : z.owner,
-          timeAgo: idx === 0 ? '5m ago' : `${5 + idx * 12}m ago`,
-          timestamp: Date.now() - (5 + idx * 12) * 60000
-        });
+      // Add actual Zombie conversions from the real conversions endpoint
+      realZombieConvs.forEach((z) => {
+        blendedEvents.push(z);
       });
 
-      // Add transfers
-      const recentlyUpdatedList = liveRec;
-      recentlyUpdatedList.forEach((r, idx) => {
-        blendedEvents.push({
-          id: `tx_${r.id}_${idx}`,
-          type: 'normie_transferred',
-          title: 'Normie transferred',
-          normieName: `Normie #${r.id}`,
-          normieId: r.id,
-          userAddress: r.owner.length > 10 ? r.owner.slice(0, 6) + '...' + r.owner.slice(-4) : r.owner,
-          timeAgo: idx === 0 ? '45s ago' : `${1 + idx * 4}m ago`,
-          timestamp: Date.now() - (45 + idx * 240) * 1000
-        });
-      });
-
-      // Add Legendary acquired events
+      // Add Legendary acquired events dynamically based on real loaded normies
       const legendaryList = liveNor.filter(n => n.status === 'Legendary' || n.rank < 100);
       legendaryList.forEach((leg, idx) => {
         blendedEvents.push({
@@ -200,46 +187,26 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
           title: 'Legendary acquired',
           normieName: `Normie #${leg.id}`,
           normieId: leg.id,
-          userAddress: leg.owner.length > 10 ? leg.owner.slice(0, 6) + '...' + leg.owner.slice(-4) : leg.owner,
+          userAddress: leg.owner,
           timeAgo: idx === 0 ? '1m ago' : `${1 + idx * 5}m ago`,
           timestamp: Date.now() - (1 + idx * 5) * 60000
         });
       });
 
-      // Add Burned events
+      // Add Burned events dynamically based on real loaded normies with no fake fallbacks
       const burnedList = liveNor.filter(n => n.status === 'Burned');
-      // If there are none from liveNor, make sure we create at least some from live metrics/dummy
-      if (burnedList.length === 0) {
-        // Generate deterministic burned events based on some of the loaded normies to keep it dynamic and tied to API data
-        const candidates = liveRec.slice(0, 3);
-        candidates.forEach((cand, idx) => {
-          // Change ID slightly to simulate on-chain burned normie
-          const burnId = (parseInt(cand.id) + 1).toString();
-          blendedEvents.push({
-            id: `burn_${burnId}_${idx}`,
-            type: 'normie_burned',
-            title: 'Normie burned',
-            normieName: `Normie #${burnId}`,
-            normieId: burnId,
-            userAddress: cand.owner.length > 10 ? cand.owner.slice(0, 6) + '...' + cand.owner.slice(-4) : cand.owner,
-            timeAgo: idx === 0 ? '2m ago' : `${2 + idx * 5}m ago`,
-            timestamp: Date.now() - (2 + idx * 5) * 60000
-          });
+      burnedList.forEach((burn, idx) => {
+        blendedEvents.push({
+          id: `burn_${burn.id}_${idx}`,
+          type: 'normie_burned',
+          title: 'Normie burned',
+          normieName: `Normie #${burn.id}`,
+          normieId: burn.id,
+          userAddress: burn.owner,
+          timeAgo: `${2 + idx * 5}m ago`,
+          timestamp: Date.now() - (2 + idx * 5) * 60000
         });
-      } else {
-        burnedList.forEach((burn, idx) => {
-          blendedEvents.push({
-            id: `burn_${burn.id}_${idx}`,
-            type: 'normie_burned',
-            title: 'Normie burned',
-            normieName: `Normie #${burn.id}`,
-            normieId: burn.id,
-            userAddress: burn.owner.length > 10 ? burn.owner.slice(0, 6) + '...' + burn.owner.slice(-4) : burn.owner,
-            timeAgo: `${2 + idx * 5}m ago`,
-            timestamp: Date.now() - (2 + idx * 5) * 60000
-          });
-        });
-      }
+      });
 
       // Sort blended events by timestamp descending
       const sortedEvents = blendedEvents.sort((a, b) => b.timestamp - a.timestamp);
@@ -250,63 +217,81 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
       setRecentNormies(liveRec);
       setTopTraits(liveTraits);
 
-      // Derive Featured Insights
+      // Derive Featured Insights conditionally based on real active items
       const highestRarity = liveNor[0] || null;
       const firstCustomized = liveAct[0] || null;
       const secondCustomized = liveAct[1] || liveAct[0] || null;
-      const legendaryItem = liveNor.find(n => n.status === 'Legendary') || liveNor[0];
+      const legendaryItem = liveNor.find(n => n.status === 'Legendary') || null;
 
-      const derivedInsights: FeaturedInsight[] = [
-        {
+      const derivedInsights: FeaturedInsight[] = [];
+      
+      if (firstCustomized) {
+        derivedInsights.push({
           id: 'most_edited',
           label: 'Most Edited Today',
-          value: firstCustomized ? `Normie #${firstCustomized.normieId}` : 'Normie #8732',
-          description: '5 customize revisions registered on-chain',
-          normieId: firstCustomized?.normieId || '8732',
+          value: `Normie #${firstCustomized.normieId}`,
+          description: 'Customize revisions registered on-chain',
+          normieId: firstCustomized.normieId,
           badge: 'Canvas Edit'
-        },
-        {
+        });
+      }
+      
+      if (legendaryItem) {
+        derivedInsights.push({
           id: 'recently_legendary',
           label: 'Recently Legendary',
-          value: legendaryItem ? `Normie #${legendaryItem.id}` : 'Normie #5421',
+          value: `Normie #${legendaryItem.id}`,
           description: 'Decoded with Legendary aura rank',
-          normieId: legendaryItem?.id || '5421',
+          normieId: legendaryItem.id,
           badge: 'Aura Sync'
-        },
-        {
+        });
+      }
+      
+      if (highestRarity) {
+        derivedInsights.push({
           id: 'highest_rarity',
           label: 'Highest Rarity',
-          value: highestRarity ? `Normie #${highestRarity.id}` : 'Normie #1189',
-          description: `Ecosystem Rank #${highestRarity?.rank || 1} • Score ${highestRarity?.score || 98.4}`,
-          normieId: highestRarity?.id || '1189',
-          badge: 'Rank #1'
-        },
-        {
+          value: `Normie #${highestRarity.id}`,
+          description: `Ecosystem Rank #${highestRarity.rank} • Score ${highestRarity.score}`,
+          normieId: highestRarity.id,
+          badge: `Rank #${highestRarity.rank}`
+        });
+      }
+      
+      if (firstCustomized && firstCustomized.userAddress && firstCustomized.userAddress !== 'Unknown') {
+        derivedInsights.push({
           id: 'most_active_owner',
           label: 'Most Active Owner',
-          value: displayAddress(firstCustomized?.userAddress || getFallbackAddress(firstCustomized?.normieId || '1189')),
+          value: displayAddress(firstCustomized.userAddress),
           description: 'Triggered multiple consensus events today',
           badge: 'Indexer Active'
-        },
-        {
+        });
+      }
+      
+      if (liveRec[0]) {
+        derivedInsights.push({
           id: 'largest_transfer',
           label: 'Largest Recent Transfer',
-          value: liveRec[0] ? `Normie #${liveRec[0].id}` : 'Normie #9821',
-          description: `Level ${liveRec[0]?.level || 88} Vault Transfer Complete`,
-          normieId: liveRec[0]?.id || '9821',
+          value: `Normie #${liveRec[0].id}`,
+          description: `Level ${liveRec[0].level} Vault Transfer Complete`,
+          normieId: liveRec[0].id,
           badge: 'Vault Transferred'
-        },
-        {
+        });
+      }
+      
+      if (secondCustomized && secondCustomized !== firstCustomized) {
+        derivedInsights.push({
           id: 'most_customized',
           label: 'Most Customized Normie',
-          value: secondCustomized ? `Normie #${secondCustomized.normieId}` : 'Normie #8732',
+          value: `Normie #${secondCustomized.normieId}`,
           description: 'Aesthetic layers saved directly on-chain',
-          normieId: secondCustomized?.normieId || '8732',
+          normieId: secondCustomized.normieId,
           badge: 'Revisions'
-        }
-      ];
+        });
+      }
 
       setInsights(derivedInsights);
+      setLastSyncedAt(Date.now());
     } catch (err) {
       console.warn('Failed to load dashboard:', err);
     } finally {
@@ -336,7 +321,6 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
     // Polling indexes for live metrics/customizations
     const interval = setInterval(() => {
       loadDashboardData();
-      setCurrentBlock(prev => prev + Math.floor(Math.random() * 3) + 1);
     }, 20000);
 
     return () => clearInterval(interval);
@@ -597,25 +581,25 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
     };
   };
 
-  const mCanvas = getMetricData('canvas_updates', '24,681', '↑ 12.4%', [12, 14, 13, 16, 15, 18, 17, 21, 20, 24]);
-  const mZombies = getMetricData('zombie_conversions', '1,243', '↑ 7.6%', [5, 6, 5, 8, 7, 9, 8, 11, 10, 12]);
-  const mTransfers = getMetricData('normies_transferred', '6,781', '↑ 8.7%', [18, 19, 17, 21, 20, 24, 22, 26, 25, 28]);
-  const mLegendary = getMetricData('legendary_acquired', '342', '↑ 3.1%', [2, 3, 2, 4, 3, 5, 4, 6, 5, 7]);
-  const mBurned = getMetricData('normies_burned', '2,156', '↑ 5.4%', [8, 10, 9, 12, 11, 14, 13, 16, 15, 18]);
+  const mCanvas = getMetricData('canvas_updates', '0', 'Live', [50, 50, 50, 50, 50, 50, 50, 50, 50, 50]);
+  const mZombies = getMetricData('zombie_conversions', '0', 'Live', [50, 50, 50, 50, 50, 50, 50, 50, 50, 50]);
+  const mTransfers = getMetricData('normies_transferred', '0', 'Live', [50, 50, 50, 50, 50, 50, 50, 50, 50, 50]);
+  const mLegendary = getMetricData('legendary_acquired', '0', 'Live', [50, 50, 50, 50, 50, 50, 50, 50, 50, 50]);
+  const mBurned = getMetricData('normies_burned', '0', 'Live', [50, 50, 50, 50, 50, 50, 50, 50, 50, 50]);
 
-  const canvasCount = parseInt(mCanvas.value.replace(/,/g, '')) || 24681;
-  const zombieCount = parseInt(mZombies.value.replace(/,/g, '')) || 1243;
-  const transfersCount = parseInt(mTransfers.value.replace(/,/g, '')) || 6781;
-  const legendaryCount = parseInt(mLegendary.value.replace(/,/g, '')) || 342;
-  const burnedCount = parseInt(mBurned.value.replace(/,/g, '')) || 2156;
+  const canvasCount = parseInt(mCanvas.value.replace(/,/g, '')) || 0;
+  const zombieCount = parseInt(mZombies.value.replace(/,/g, '')) || 0;
+  const transfersCount = parseInt(mTransfers.value.replace(/,/g, '')) || 0;
+  const legendaryCount = parseInt(mLegendary.value.replace(/,/g, '')) || 0;
+  const burnedCount = parseInt(mBurned.value.replace(/,/g, '')) || 0;
 
   const totalCount = canvasCount + zombieCount + transfersCount + legendaryCount + burnedCount;
 
-  const pCanvas = canvasCount / totalCount || 0.521;
-  const pZombies = zombieCount / totalCount || 0.127;
-  const pTransfers = transfersCount / totalCount || 0.234;
-  const pLegendary = legendaryCount / totalCount || 0.078;
-  const pBurned = burnedCount / totalCount || 0.040;
+  const pCanvas = totalCount > 0 ? (canvasCount / totalCount) : 0;
+  const pZombies = totalCount > 0 ? (zombieCount / totalCount) : 0;
+  const pTransfers = totalCount > 0 ? (transfersCount / totalCount) : 0;
+  const pLegendary = totalCount > 0 ? (legendaryCount / totalCount) : 0;
+  const pBurned = totalCount > 0 ? (burnedCount / totalCount) : 0;
 
   return (
     <div className="fixed inset-0 z-40 bg-[#060608] flex overflow-hidden font-sans text-white">
@@ -769,7 +753,7 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
             </div>
             <div className="flex items-center justify-between text-[10px] text-zinc-600 font-mono mt-3.5 border-t border-zinc-900 pt-2.5">
               <span>Last updated</span>
-              <span>12s ago</span>
+              <span>{syncedAgoText}</span>
             </div>
           </div>
         ) : (
@@ -836,16 +820,19 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
             }`}
           >
             <div className="flex items-center gap-2.5 min-w-0">
-              <div className="w-7 h-7 rounded-full bg-[#18181b] border border-zinc-800 flex items-center justify-center overflow-hidden shrink-0">
-                <img 
-                  src="https://api.normies.art/normie/152/image.png" 
-                  alt="Profile Avatar" 
-                  className="w-full h-full object-cover scale-110"
-                  referrerPolicy="no-referrer"
-                  onError={(e) => {
-                    (e.target as HTMLElement).style.display = 'none';
-                  }}
-                />
+              <div className="w-7 h-7 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center overflow-hidden shrink-0">
+                {authenticated && user?.avatarUrl ? (
+                  <img 
+                    src={user.avatarUrl} 
+                    alt="Profile Avatar" 
+                    className="w-full h-full object-cover scale-110"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <span className="text-[10px] font-bold text-zinc-400 font-mono">
+                    {walletConnected ? 'U' : 'G'}
+                  </span>
+                )}
               </div>
               {!sidebarCollapsed && (
                 <div className="flex flex-col min-w-0">
@@ -931,8 +918,16 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
                               onClick={() => {
                                 setShowNotifications(false);
                                 (async () => {
-                                  const matched = await getNormieById(act.normieId);
-                                  if (matched) onSelectNormie(matched);
+                                  try {
+                                    const matched = await getNormieById(act.normieId);
+                                    if (matched) {
+                                      onSelectNormie(matched);
+                                    } else {
+                                      showNotification(`Failed to load details for Normie #${act.normieId}`);
+                                    }
+                                  } catch (err) {
+                                    showNotification(`Failed to load details for Normie #${act.normieId}`);
+                                  }
                                 })();
                               }}
                               className="p-3 hover:bg-zinc-800/30 transition-all cursor-pointer text-left group"
@@ -977,13 +972,19 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
               onClick={() => setShowProfileMenu(!showProfileMenu)}
               className="flex items-center gap-2 bg-[#0c0c0e] border border-zinc-800/60 rounded-xl px-2.5 py-2 md:px-3.5 md:py-2 cursor-pointer hover:border-zinc-700 transition-all"
             >
-              <div className="w-6 h-6 rounded-full bg-[#18181b] border border-zinc-800 flex items-center justify-center overflow-hidden shrink-0">
-                <img 
-                  src="https://api.normies.art/normie/152/image.png" 
-                  alt="Profile Avatar" 
-                  className="w-full h-full object-cover scale-110"
-                  referrerPolicy="no-referrer"
-                />
+              <div className="w-6 h-6 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center overflow-hidden shrink-0">
+                {authenticated && user?.avatarUrl ? (
+                  <img 
+                    src={user.avatarUrl} 
+                    alt="Profile Avatar" 
+                    className="w-full h-full object-cover scale-110"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <span className="text-[10px] font-bold text-zinc-400 font-mono">
+                    {walletConnected ? 'U' : 'G'}
+                  </span>
+                )}
               </div>
               <span className="hidden sm:inline text-xs font-mono font-bold text-white tracking-tight">
                 {walletConnected ? 'User' : 'Guest'}
@@ -1035,10 +1036,7 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
                         <span className="text-2xl font-bold font-mono text-white block">{formatMetricValue(mCanvas.value)}</span>
                       </div>
                       <div className="mt-2 flex items-end justify-between">
-                        <span className="text-[11px] font-semibold text-emerald-500 font-mono flex items-center gap-0.5">{mCanvas.change}</span>
-                        <div className="w-20 h-6 opacity-80">
-                          <Sparkline data={mCanvas.spark} color="success" width={80} height={20} />
-                        </div>
+                        <span className="text-[11px] font-semibold text-emerald-500 font-mono flex items-center gap-0.5">Live index active</span>
                       </div>
                     </div>
                   )}
@@ -1068,10 +1066,7 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
                         <span className="text-2xl font-bold font-mono text-white block">{formatMetricValue(mZombies.value)}</span>
                       </div>
                       <div className="mt-2 flex items-end justify-between">
-                        <span className="text-[11px] font-semibold text-purple-400 font-mono flex items-center gap-0.5">{mZombies.change}</span>
-                        <div className="w-20 h-6 opacity-80">
-                          <Sparkline data={mZombies.spark} color="legendary" width={80} height={20} />
-                        </div>
+                        <span className="text-[11px] font-semibold text-purple-400 font-mono flex items-center gap-0.5">Live index active</span>
                       </div>
                     </div>
                   )}
@@ -1101,10 +1096,7 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
                         <span className="text-2xl font-bold font-mono text-white block">{formatMetricValue(mTransfers.value)}</span>
                       </div>
                       <div className="mt-2 flex items-end justify-between">
-                        <span className="text-[11px] font-semibold text-blue-400 font-mono flex items-center gap-0.5">{mTransfers.change}</span>
-                        <div className="w-20 h-6 opacity-80">
-                          <Sparkline data={mTransfers.spark} color="info" width={80} height={20} />
-                        </div>
+                        <span className="text-[11px] font-semibold text-blue-400 font-mono flex items-center gap-0.5">Live index active</span>
                       </div>
                     </div>
                   )}
@@ -1134,10 +1126,7 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
                         <span className="text-2xl font-bold font-mono text-white block">{formatMetricValue(mLegendary.value)}</span>
                       </div>
                       <div className="mt-2 flex items-end justify-between">
-                        <span className="text-[11px] font-semibold text-[#f59e0b] font-mono flex items-center gap-0.5">{mLegendary.change}</span>
-                        <div className="w-20 h-6 opacity-80">
-                          <Sparkline data={mLegendary.spark} color="warning" width={80} height={20} />
-                        </div>
+                        <span className="text-[11px] font-semibold text-[#f59e0b] font-mono flex items-center gap-0.5">Live index active</span>
                       </div>
                     </div>
                   )}
@@ -1167,10 +1156,7 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
                         <span className="text-2xl font-bold font-mono text-white block">{formatMetricValue(mBurned.value)}</span>
                       </div>
                       <div className="mt-2 flex items-end justify-between">
-                        <span className="text-[11px] font-semibold text-red-500 font-mono flex items-center gap-0.5">{mBurned.change}</span>
-                        <div className="w-20 h-6 opacity-80">
-                          <Sparkline data={mBurned.spark} color="error" width={80} height={20} />
-                        </div>
+                        <span className="text-[11px] font-semibold text-red-500 font-mono flex items-center gap-0.5">Live index active</span>
                       </div>
                     </div>
                   )}
@@ -1256,7 +1242,7 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
                                   } font-sans`}>
                                     ☆ {normie.status}
                                   </span>
-                                  <span className="text-emerald-500 font-semibold">↑ {parseFloat((10 + (idx * 3.5) + (Math.sin(parseInt(normie.id)) * 5)).toFixed(1))}%</span>
+                                  <span className="text-zinc-500 font-mono">Rank #{normie.rank}</span>
                                 </div>
                               </div>
                             </div>
@@ -1366,10 +1352,10 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
                         )}
                       </div>
 
-                      {/* Panel B: Recent Discoveries */}
+                      {/* Panel B: Recently Updated Normies */}
                       <div className="bg-[#0c0c0e] border border-zinc-800/80 rounded-xl p-5 flex flex-col justify-between h-[300px]">
                         <div className="flex items-center justify-between border-b border-zinc-900 pb-3 shrink-0">
-                          <h4 className="text-sm font-bold font-sans text-white">Recent Discoveries</h4>
+                          <h4 className="text-sm font-bold font-sans text-white">Recently Updated Normies</h4>
                           <button 
                             onClick={() => { setActiveTab('explore'); setDiscoverPage(1); }} 
                             className="text-xs text-zinc-400 hover:text-white transition-colors font-sans cursor-pointer"
@@ -1393,14 +1379,14 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
                               </div>
                             ))
                           ) : (
-                            recentNormies.slice(0, 4).map((normie, idx) => {
-                              let desc = `Canvas customized by ${displayAddress(normie.owner)}`;
+                            recentNormies.slice(0, 4).map((normie) => {
+                              let desc = `Active state, owned by ${displayAddress(normie.owner)}`;
                               if (normie.status === 'Zombie') {
-                                desc = `Zombie conversion by ${displayAddress(normie.owner)}`;
+                                desc = `Zombie state, owned by ${displayAddress(normie.owner)}`;
                               } else if (normie.status === 'Legendary') {
-                                desc = `Legendary acquired by ${displayAddress(normie.owner)}`;
+                                desc = `Legendary state, owned by ${displayAddress(normie.owner)}`;
                               } else if (normie.status === 'Burned') {
-                                desc = `Normie burned from ecosystem`;
+                                desc = `Burned from ecosystem`;
                               }
                               
                               return (
@@ -1438,7 +1424,7 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
                                     </div>
                                   </div>
                                   <span className="text-[10px] text-zinc-500 font-mono shrink-0">
-                                    {idx === 0 ? 'Just now' : idx === 1 ? '5m ago' : idx === 2 ? '12m ago' : '20m ago'}
+                                    {normie.updatedAt || 'Recently'}
                                   </span>
                                 </div>
                               );
@@ -1507,19 +1493,17 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
                             return (
                               <div 
                                 key={act.id} 
-                                onClick={() => {
-                                  onSelectNormie({
-                                    id: act.normieId,
-                                    name: `Normie #${act.normieId}`,
-                                    imageUrl: `https://api.normies.art/normie/${act.normieId}/image.png`,
-                                    owner: act.userAddress,
-                                    level: 1,
-                                    status: act.type === 'zombie_conversion' ? 'Zombie' : act.type === 'legendary_acquired' ? 'Legendary' : 'Active',
-                                    updatedAt: act.timeAgo,
-                                    traits: [],
-                                    score: 50,
-                                    rank: 5000
-                                  });
+                                onClick={async () => {
+                                  try {
+                                    const matched = await getNormieById(act.normieId);
+                                    if (matched) {
+                                      onSelectNormie(matched);
+                                    } else {
+                                      showNotification(`Failed to load details for Normie #${act.normieId}`);
+                                    }
+                                  } catch (err) {
+                                    showNotification(`Failed to load details for Normie #${act.normieId}`);
+                                  }
                                 }}
                                 className="flex items-center justify-between gap-3 cursor-pointer hover:bg-zinc-900/30 px-1 py-1 rounded transition-all group"
                               >
@@ -2065,15 +2049,11 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
                           // Determine the operator or from/to addresses based on action type
                           let displayAddr = '';
                           if (act.type === 'normie_transferred') {
-                            const hash1 = (parseInt(act.normieId || '0') * 17 + 1024) % 10000;
-                            const hash2 = (parseInt(act.normieId || '0') * 43 + 2048) % 10000;
-                            const sender = `0x8a${hash1.toString(16).padEnd(4, 'a')}...21e0`;
-                            const receiver = act.userAddress ? (act.userAddress.length > 10 ? act.userAddress.slice(0, 4) + '...' + act.userAddress.slice(-4) : act.userAddress) : `0x7b${hash2.toString(16).padEnd(4, 'c')}...c6d2`;
-                            displayAddr = `from ${sender} to ${receiver}`;
+                            displayAddr = act.userAddress ? `to ${displayAddress(act.userAddress)}` : 'Unknown Transfer';
                           } else {
-                            const addr = act.userAddress || getFallbackAddress(act.normieId || '1189');
+                            const addr = act.userAddress || 'Unknown';
                             const formatted = displayAddress(addr);
-                            displayAddr = `by ${formatted}`;
+                            displayAddr = addr === 'Unknown' ? 'Unknown Operator' : `by ${formatted}`;
                           }
 
                           // Get dynamic badge styling
@@ -2088,8 +2068,16 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
                             <div 
                               key={act.id}
                               onClick={async () => {
-                                const matched = await getNormieById(act.normieId);
-                                if (matched) onSelectNormie(matched);
+                                try {
+                                  const matched = await getNormieById(act.normieId);
+                                  if (matched) {
+                                    onSelectNormie(matched);
+                                  } else {
+                                    showNotification(`Failed to load details for Normie #${act.normieId}`);
+                                  }
+                                } catch (err) {
+                                  showNotification(`Failed to load details for Normie #${act.normieId}`);
+                                }
                               }}
                               className="bg-[#0c0c0e]/60 border border-zinc-900/80 hover:border-zinc-850 rounded-xl p-4 flex items-center justify-between transition-all cursor-pointer group"
                             >

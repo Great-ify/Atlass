@@ -474,11 +474,11 @@ export function PrivyProvider({ children }: { children: React.ReactNode }) {
               <div className="w-full mt-6 pt-4 border-t border-zinc-900 text-center">
                 <p className="text-[9px] text-zinc-500 leading-relaxed font-sans max-w-[280px]">
                   By continuing, you agree to our{' '}
-                  <a href="#terms" onClick={(e) => { e.preventDefault(); alert('Atlas Ecosystem Terms of Service: Welcome to Atlas. All index data, signals, and wallet coordinate tracking are provided for educational and diagnostic purposes.'); }} className="text-zinc-400 hover:text-white underline transition-colors">
+                  <a href="#terms" onClick={(e) => { e.preventDefault(); setLoginError('Atlas Terms of Service: Welcome to Atlas. All index data, signals, and wallet coordinate tracking are provided for educational and diagnostic purposes.'); }} className="text-zinc-400 hover:text-white underline transition-colors">
                     Terms of Service
                   </a>{' '}
                   and{' '}
-                  <a href="#privacy" onClick={(e) => { e.preventDefault(); alert('Atlas Ecosystem Privacy Policy: We value secure coordination. Your local session keys and saved search indexes are stored privately inside your standard secure browser storage.'); }} className="text-zinc-400 hover:text-white underline transition-colors">
+                  <a href="#privacy" onClick={(e) => { e.preventDefault(); setLoginError('Atlas Privacy Policy: We value secure coordination. Your local session keys and saved search indexes are stored privately inside your browser storage.'); }} className="text-zinc-400 hover:text-white underline transition-colors">
                     Privacy Policy
                   </a>.
                 </p>

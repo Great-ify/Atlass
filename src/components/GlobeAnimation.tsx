@@ -22,8 +22,8 @@ const GLOBE_EVENTS: GlobeEvent[] = [
     id: 'g1',
     type: 'canvas_updated',
     label: 'Canvas Updated',
-    normieId: '#8732',
-    time: '12s ago',
+    normieId: '--',
+    time: '--',
     x: 42,
     y: 35,
     cardX: -170,
@@ -36,8 +36,8 @@ const GLOBE_EVENTS: GlobeEvent[] = [
     id: 'g2',
     type: 'zombie_conversion',
     label: 'Zombie Conversion',
-    normieId: '#5421',
-    time: '28s ago',
+    normieId: '--',
+    time: '--',
     x: 35,
     y: 65,
     cardX: -160,
@@ -50,8 +50,8 @@ const GLOBE_EVENTS: GlobeEvent[] = [
     id: 'g3',
     type: 'normie_transferred',
     label: 'Normie Transferred',
-    normieId: '#1189',
-    time: '45s ago',
+    normieId: '--',
+    time: '--',
     x: 68,
     y: 52,
     cardX: 165,
@@ -64,8 +64,8 @@ const GLOBE_EVENTS: GlobeEvent[] = [
     id: 'g4',
     type: 'legendary_acquired',
     label: 'Legendary Acquired',
-    normieId: '#9821',
-    time: '1m ago',
+    normieId: '--',
+    time: '--',
     x: 60,
     y: 20,
     cardX: 160,
@@ -78,8 +78,8 @@ const GLOBE_EVENTS: GlobeEvent[] = [
     id: 'g5',
     type: 'normie_burned',
     label: 'Normie Burned',
-    normieId: '#7632',
-    time: '2m ago',
+    normieId: '--',
+    time: '--',
     x: 58,
     y: 80,
     cardX: 140,
@@ -119,9 +119,9 @@ export default function GlobeAnimation() {
         // Fetch general stats for the central HUD
         const statsRes = await fetch('/api/normies/rarity/stats');
         const histStatsRes = await fetch('/api/normies/history/stats');
-        let total = '10,000';
-        let transferred = '6,781';
-        let burned = '2,156';
+        let total = '--';
+        let transferred = '--';
+        let burned = '--';
 
         if (statsRes.ok) {
           const stats = await statsRes.json();
@@ -135,8 +135,8 @@ export default function GlobeAnimation() {
 
         if (histStatsRes.ok) {
           const hStats = await histStatsRes.json();
-          const transfersCount = hStats.totalBurnCommitments ?? hStats.transfers ?? hStats.transferCount ?? 6781;
-          transferred = transfersCount.toLocaleString();
+          const transfersCount = hStats.totalBurnCommitments ?? hStats.transfers ?? hStats.transferCount ?? 0;
+          transferred = transfersCount > 0 ? transfersCount.toLocaleString() : '--';
         }
 
         setLiveStats({ total, transferred, burned });
@@ -146,46 +146,46 @@ export default function GlobeAnimation() {
           return prev.map((item, index) => {
             if (index === 0 && customEvents[0]) {
               const ev = customEvents[0];
-              const normieId = (ev.tokenId ?? ev.id ?? '8732').toString();
+              const normieId = (ev.tokenId ?? ev.id ?? '').toString();
               const timestamp = ev.timestamp ? parseInt(ev.timestamp) * 1000 : Date.now() - 12000;
               const secondsAgo = Math.max(1, Math.floor((Date.now() - timestamp) / 1000));
               const time = secondsAgo < 60 ? `${secondsAgo}s ago` : `${Math.floor(secondsAgo / 60)}m ago`;
-              return { ...item, normieId: `#${normieId}`, time };
+              return { ...item, normieId: normieId ? `#${normieId}` : '--', time };
             }
             if (index === 1 && recentNormies[0]) {
               const normie = recentNormies[0];
-              const normieId = (normie.tokenId ?? normie.id ?? '5421').toString();
+              const normieId = (normie.tokenId ?? normie.id ?? '').toString();
               const isZombie = normie.status === 'Zombie' || normie.zombie || normie.isZombie;
               return { 
                 ...item, 
-                normieId: `#${normieId}`, 
+                normieId: normieId ? `#${normieId}` : '--', 
                 label: isZombie ? 'Zombie Conversion' : 'Active Normie',
                 time: 'Just synced'
               };
             }
             if (index === 2 && recentNormies[1]) {
               const normie = recentNormies[1];
-              const normieId = (normie.tokenId ?? normie.id ?? '1189').toString();
-              return { ...item, normieId: `#${normieId}`, time: 'Live on-chain' };
+              const normieId = (normie.tokenId ?? normie.id ?? '').toString();
+              return { ...item, normieId: normieId ? `#${normieId}` : '--', time: 'Live on-chain' };
             }
             if (index === 3 && recentNormies[2]) {
               const normie = recentNormies[2];
-              const normieId = (normie.tokenId ?? normie.id ?? '9821').toString();
+              const normieId = (normie.tokenId ?? normie.id ?? '').toString();
               const isLegendary = normie.status === 'Legendary' || normie.legendary || normie.isLegendary;
               return { 
                 ...item, 
-                normieId: `#${normieId}`, 
+                normieId: normieId ? `#${normieId}` : '--', 
                 label: isLegendary ? 'Legendary Acquired' : 'Normie Indexed',
                 time: 'Verified'
               };
             }
             if (index === 4 && customEvents[1]) {
               const ev = customEvents[1];
-              const normieId = (ev.tokenId ?? ev.id ?? '7632').toString();
+              const normieId = (ev.tokenId ?? ev.id ?? '').toString();
               const timestamp = ev.timestamp ? parseInt(ev.timestamp) * 1000 : Date.now() - 120000;
               const secondsAgo = Math.max(1, Math.floor((Date.now() - timestamp) / 1000));
               const time = secondsAgo < 60 ? `${secondsAgo}s ago` : `${Math.floor(secondsAgo / 60)}m ago`;
-              return { ...item, normieId: `#${normieId}`, time };
+              return { ...item, normieId: normieId ? `#${normieId}` : '--', time };
             }
             return item;
           });
@@ -204,6 +204,7 @@ export default function GlobeAnimation() {
   useEffect(() => {
     const interval = setInterval(() => {
       setTick(t => t + 1);
+      // Purely decorative animation/visual choice to cycle UI visual focus over active sphere hotspots
       const nextIdx = Math.floor(Math.random() * (events.length + 2)); // include periods of no highlight
       if (nextIdx < events.length) {
         setActiveEvent(events[nextIdx].id);
@@ -381,6 +382,7 @@ export default function GlobeAnimation() {
 
       {/* Connection Lines & Floating Activity Cards */}
       {events.map((evt) => {
+        if (!evt.normieId || evt.normieId === '--') return null;
         const isActive = activeEvent === evt.id;
         const IconComponent = evt.icon;
         

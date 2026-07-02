@@ -14,10 +14,10 @@ export interface MetricItem {
   id: string;
   label: string;
   value: string;
-  change: string;
-  isPositive: boolean;
+  change?: string;
+  isPositive?: boolean;
   color: 'success' | 'warning' | 'error' | 'info' | 'legendary';
-  sparklineData: number[];
+  sparklineData?: number[];
 }
 
 export interface TraitItem {

@@ -2,6 +2,7 @@
   "buildCommand": "vite build",
   "outputDirectory": "dist",
   "rewrites": [
+    { "source": "/api/normies/:path*", "destination": "/api/normies" },
     { "source": "/((?!api/).*)", "destination": "/index.html" }
   ]
 }

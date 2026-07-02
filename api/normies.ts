@@ -17,29 +17,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return;
   }
 
-  // 1. Try to extract subpath from req.query.path (Vercel's native dynamic catch-all route parameter)
-  const { path, ...query } = req.query;
-  let subPath = '';
-  if (path) {
-    subPath = Array.isArray(path) ? path.join('/') : path;
-  }
+  // Robustly extract subpath and query parameters directly from req.url
+  const fullUrl = req.url ?? '';
+  const prefix = '/api/normies';
+  const index = fullUrl.indexOf(prefix);
+  const urlSubPath = index !== -1 ? fullUrl.substring(index + prefix.length) : fullUrl;
 
-  // 2. Fallback to parsing from req.url if req.query.path was not populated
-  if (!subPath) {
-    const fullUrl = req.url ?? '';
-    const prefix = '/api/normies';
-    const index = fullUrl.indexOf(prefix);
-    const urlSubPath = index !== -1 ? fullUrl.substring(index + prefix.length) : fullUrl;
-    const pathPart = urlSubPath.split('?')[0];
-    subPath = pathPart.startsWith('/') ? pathPart.substring(1) : pathPart;
-  }
-
-  // Reconstruct clean query parameters
-  const queryString = new URLSearchParams(
-    Object.entries(query).flatMap(([key, value]) =>
-      Array.isArray(value) ? value.map(v => [key, v]) : [[key, value as string]]
-    )
-  ).toString();
+  // Split into path and query string parts
+  const [pathPart, queryPart] = urlSubPath.split('?');
+  const subPath = pathPart.startsWith('/') ? pathPart.substring(1) : pathPart;
+  const queryString = queryPart ?? '';
 
   // Construct target URL ensuring clean slash separation
   const targetUrl = `https://api.normies.art/${subPath}${queryString ? `?${queryString}` : ''}`;

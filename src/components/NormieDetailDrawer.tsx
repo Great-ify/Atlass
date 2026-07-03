@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, ExternalLink, Copy, Check, Shield, Layers, Calendar, User, Zap, Activity, Grid } from 'lucide-react';
 import { NormieItem } from '../types';
-import { fetchNormieVersions, fetchNormieCanvasDiff, fetchZombieTokenHistory, NormieVersion, CanvasDiff, ZombieConversion } from '../data';
+import { fetchNormieVersions, fetchNormieCanvasDiff, fetchZombieTokenHistory, NormieVersion, CanvasDiff, ZombieConversion, fetchNormieDetail } from '../data';
 import { usePrivy } from '../lib/privy';
 
 interface NormieDetailDrawerProps {
@@ -33,6 +33,7 @@ export default function NormieDetailDrawer({ normie, onClose }: NormieDetailDraw
   const [canvasDiff, setCanvasDiff] = useState<CanvasDiff | null>(null);
   const [zombieHistory, setZombieHistory] = useState<ZombieConversion[]>([]);
   const [loading, setLoading] = useState(false);
+  const [fullNormie, setFullNormie] = useState<NormieItem | null>(null);
 
   useEffect(() => {
     if (!normie) return;
@@ -40,15 +41,21 @@ export default function NormieDetailDrawer({ normie, onClose }: NormieDetailDraw
     async function loadAll() {
       setLoading(true);
       try {
-        const [vData, cData, zData] = await Promise.all([
+        const [vData, cData, zData, detailedItem] = await Promise.all([
           fetchNormieVersions(normie.id),
           fetchNormieCanvasDiff(normie.id),
-          normie.status === 'Zombie' ? fetchZombieTokenHistory(normie.id) : Promise.resolve([])
+          normie.status === 'Zombie' ? fetchZombieTokenHistory(normie.id) : Promise.resolve([]),
+          fetchNormieDetail(normie.id)
         ]);
         if (active) {
           setVersions(vData);
           setCanvasDiff(cData);
           setZombieHistory(zData);
+          if (detailedItem) {
+            setFullNormie(detailedItem);
+          } else {
+            setFullNormie(normie);
+          }
         }
       } catch (err) {
         console.warn('Error fetching detail drawer active data:', err);
@@ -59,12 +66,14 @@ export default function NormieDetailDrawer({ normie, onClose }: NormieDetailDraw
     loadAll();
     return () => {
       active = false;
+      setFullNormie(null);
     };
   }, [normie?.id, normie?.status]);
 
   const handleCopy = () => {
-    if (!normie) return;
-    navigator.clipboard.writeText(normie.owner);
+    const currentNormie = fullNormie ?? normie;
+    if (!currentNormie) return;
+    navigator.clipboard.writeText(currentNormie.owner);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -101,6 +110,8 @@ export default function NormieDetailDrawer({ normie, onClose }: NormieDetailDraw
 
   if (!normie) return null;
 
+  const currentNormie = fullNormie ?? normie;
+
   const statusColorMap = {
     Active: { bg: 'bg-emerald-500/10', text: 'text-emerald-500', border: 'border-emerald-500/20', dot: 'bg-emerald-500', label: 'Active on-chain' },
     Zombie: { bg: 'bg-amber-500/10', text: 'text-amber-500', border: 'border-amber-500/20', dot: 'bg-amber-500', label: 'Zombie conversion' },
@@ -108,7 +119,7 @@ export default function NormieDetailDrawer({ normie, onClose }: NormieDetailDraw
     Burned: { bg: 'bg-red-500/10', text: 'text-red-500', border: 'border-red-500/20', dot: 'bg-red-500', label: 'Ecosystem burned' },
   };
 
-  const statusStyle = statusColorMap[normie.status] || statusColorMap.Active;
+  const statusStyle = statusColorMap[currentNormie.status] || statusColorMap.Active;
 
   return (
     <AnimatePresence>
@@ -153,52 +164,50 @@ export default function NormieDetailDrawer({ normie, onClose }: NormieDetailDraw
             <div className="w-full md:w-80 border-b md:border-b-0 md:border-r border-zinc-800 bg-[#0b0b0d] p-6 flex flex-col items-center shrink-0">
               <div className="relative aspect-square w-full rounded-lg overflow-hidden border border-zinc-800 bg-[#111113] group">
                 <img 
-                  src={normie.imageUrl} 
-                  alt={normie.name} 
+                  src={currentNormie.imageUrl} 
+                  alt={currentNormie.name} 
                   className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
                   referrerPolicy="no-referrer"
                 />
                 
                 {/* Floating tags */}
                 <div className="absolute top-2.5 left-2.5 bg-black/85 px-2 py-0.5 rounded text-[8px] font-mono border border-zinc-800 text-zinc-300">
-                  RANK #{normie.rank}
+                  RANK #{currentNormie.rank}
                 </div>
                 <div className={`absolute bottom-2.5 right-2.5 px-2 py-0.5 rounded text-[8px] font-mono border font-bold ${statusStyle.bg} ${statusStyle.text} ${statusStyle.border}`}>
-                  {normie.status.toUpperCase()}
+                  {currentNormie.status.toUpperCase()}
                 </div>
               </div>
 
               {/* Rarity and Stats Column */}
               <div className="w-full mt-6 space-y-4">
-                <div className="text-center md:text-left">
-                  <h3 className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">Decoded Token Identity</h3>
-                  <h2 className="text-xl font-bold font-sans text-white mt-1">#{normie.id}</h2>
-                  <div className="text-xs text-zinc-400 mt-1">{normie.name}</div>
-                </div>
+                <h3 className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 text-center md:text-left">Decoded Normie Identity</h3>
+                <h2 className="text-xl font-bold font-sans text-white mt-1 text-center md:text-left">#{currentNormie.id}</h2>
+                <div className="text-xs text-zinc-400 mt-1 text-center md:text-left">{currentNormie.name}</div>
 
                 <div className="grid grid-cols-2 gap-2.5 pt-4 border-t border-zinc-800/80">
                   <div className="bg-[#111113]/50 border border-zinc-800/60 p-2.5 rounded-lg">
                     <span className="block text-[8px] font-mono text-zinc-500 uppercase tracking-wider">Level</span>
-                    <span className="text-sm font-bold font-mono text-white mt-0.5 block">{normie.level}</span>
+                    <span className="text-sm font-bold font-mono text-white mt-0.5 block">{currentNormie.level}</span>
                   </div>
                   <div className="bg-[#111113]/50 border border-zinc-800/60 p-2.5 rounded-lg">
                     <span className="block text-[8px] font-mono text-zinc-500 uppercase tracking-wider">Rarity Score</span>
-                    <span className="text-sm font-bold font-mono text-purple-400 mt-0.5 block">{normie.score}</span>
+                    <span className="text-sm font-bold font-mono text-purple-400 mt-0.5 block">{currentNormie.score}</span>
                   </div>
                 </div>
 
                 <div className="bg-[#111113]/50 border border-zinc-800/60 p-3 rounded-lg space-y-1.5">
-                  <span className="block text-[8px] font-mono text-zinc-500 uppercase tracking-wider">Current Owner Vault</span>
+                  <span className="block text-[8px] font-mono text-zinc-500 uppercase tracking-wider">Current Owner Address</span>
                   <div className="flex items-center justify-between text-[11px] font-mono text-white">
-                    <span className="truncate max-w-[140px]" title={normie.owner}>
-                      {displayAddress(normie.owner)}
+                    <span className="truncate max-w-[140px]" title={currentNormie.owner}>
+                      {displayAddress(currentNormie.owner)}
                     </span>
                     <button onClick={handleCopy} className="text-zinc-500 hover:text-white transition-colors ml-1 shrink-0">
                       {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
                     </button>
                   </div>
                   <a 
-                    href={`https://etherscan.io/nft/0x9eb6e2025b64f340691e424b7fe7022ffde12438/${normie.id}`} 
+                    href={`https://etherscan.io/nft/0x9eb6e2025b64f340691e424b7fe7022ffde12438/${currentNormie.id}`} 
                     target="_blank" 
                     rel="noreferrer" 
                     className="text-[9px] text-zinc-400 hover:text-white font-mono flex items-center gap-1 mt-2.5 w-fit hover:underline"
@@ -236,31 +245,25 @@ export default function NormieDetailDrawer({ normie, onClose }: NormieDetailDraw
                 {/* TAB 1: OVERVIEW */}
                 {activeTab === 'overview' && (
                   <div className="space-y-6">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="bg-[#111113]/40 border border-zinc-800/80 p-3.5 rounded-lg">
-                        <span className="block text-[8px] font-mono text-zinc-500 uppercase">Ecosystem Status</span>
-                        <span className={`text-xs font-semibold ${statusStyle.text} mt-1 block flex items-center gap-1.5`}>
-                          <span className={`w-1.5 h-1.5 rounded-full ${statusStyle.dot} animate-pulse`} />
-                          <span>{statusStyle.label}</span>
-                        </span>
-                      </div>
-                      <div className="bg-[#111113]/40 border border-zinc-800/80 p-3.5 rounded-lg">
-                        <span className="block text-[8px] font-mono text-zinc-500 uppercase">Indexing Status</span>
-                        <span className="text-xs font-semibold text-emerald-500 mt-1 block font-mono">Sync Complete</span>
-                      </div>
+                    <div className="bg-[#111113]/40 border border-zinc-800/80 p-3.5 rounded-lg">
+                      <span className="block text-[8px] font-mono text-zinc-500 uppercase">Normie Status</span>
+                      <span className={`text-xs font-semibold ${statusStyle.text} mt-1 block flex items-center gap-1.5`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${statusStyle.dot} animate-pulse`} />
+                        <span>{statusStyle.label}</span>
+                      </span>
                     </div>
 
                     <div className="space-y-2">
                       <h4 className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">About this Entity</h4>
                       <p className="text-xs text-zinc-300 leading-relaxed font-sans">
-                        This Normie #{normie.id} ({normie.name}) metadata package is indexed from the Ethereum ERC-721 contract. The pixel map records represent the history of canvas modifications, active level {normie.level} states, and dynamic transform actions logged across Ponder indexer nodes.
+                        This Normie #{currentNormie.id} ({currentNormie.name}) metadata package is indexed from the Ethereum ERC-721 contract. The pixel map records represent the history of canvas modifications, active level {currentNormie.level} states, and dynamic transform actions logged across Ponder indexer nodes.
                       </p>
                     </div>
 
                     <div className="space-y-3">
                       <h4 className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Attributes Decoding</h4>
                       <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                        {normie.traits.map((trait, idx) => (
+                        {currentNormie.traits.map((trait, idx) => (
                           <div key={idx} className="bg-[#111113]/60 border border-zinc-800/80 p-2.5 rounded-lg flex flex-col justify-between">
                             <span className="text-[8px] font-mono text-zinc-500 uppercase tracking-wider">{trait.trait_type}</span>
                             <span className="text-xs font-semibold text-white mt-1 truncate">{trait.value}</span>
@@ -289,7 +292,7 @@ export default function NormieDetailDrawer({ normie, onClose }: NormieDetailDraw
                               <span className="text-xs font-sans font-semibold text-white">
                                 {idx === versions.length - 1 ? 'Original Mint' : `Canvas customized`}
                               </span>
-                              <span className="text-[9px] font-mono text-zinc-500">{getRelativeTime(version.timestamp)}</span>
+                              <span className="text-[9px] font-mono text-zinc-500">{formatTime(version.timestamp)}</span>
                             </div>
                             <div className="text-[10px] text-zinc-400 font-mono mt-1 flex flex-col gap-0.5">
                               <span>Operator: {displayAddress(version.transformer)}</span>
@@ -312,7 +315,7 @@ export default function NormieDetailDrawer({ normie, onClose }: NormieDetailDraw
                       <Grid className="w-8 h-8 text-emerald-500" />
                       <div>
                         <h4 className="text-xs font-bold text-white font-sans">Canvas State Map</h4>
-                        <p className="text-[10px] text-zinc-400 font-mono mt-1">Entity has active canvas overrides registered under {displayAddress(normie.owner)}.</p>
+                        <p className="text-[10px] text-zinc-400 font-mono mt-1">Entity has active canvas overrides registered under {displayAddress(currentNormie.owner)}.</p>
                       </div>
                     </div>
 
@@ -349,7 +352,7 @@ export default function NormieDetailDrawer({ normie, onClose }: NormieDetailDraw
                   <div className="space-y-4">
                     <h4 className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">Rarity Breakdown</h4>
                     <div className="space-y-3">
-                      {normie.traits.map((trait, idx) => (
+                      {currentNormie.traits.map((trait, idx) => (
                         <div key={idx} className="bg-[#111113]/40 border border-zinc-800/80 p-3 rounded-lg flex items-center justify-between">
                           <div>
                             <span className="text-[8px] font-mono text-zinc-500 uppercase block">{trait.trait_type}</span>
@@ -357,7 +360,9 @@ export default function NormieDetailDrawer({ normie, onClose }: NormieDetailDraw
                           </div>
                           <div className="text-right">
                             <span className="text-xs font-mono font-bold text-purple-400 block">{trait.rarity}</span>
-                            <span className="text-[8px] font-mono text-zinc-500 uppercase tracking-wider block">rarity index</span>
+                            <span className="text-[8px] font-mono text-zinc-500 uppercase tracking-wider block">
+                              {trait.ic !== undefined ? `Index Score: +${trait.ic}` : 'rarity index'}
+                            </span>
                           </div>
                         </div>
                       ))}
@@ -405,7 +410,7 @@ export default function NormieDetailDrawer({ normie, onClose }: NormieDetailDraw
                                     <span className={`w-1.5 h-1.5 rounded-full ${act.type === 'zombie_conversion' ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'}`} />
                                     <span className="text-white font-bold">{act.title}</span>
                                   </div>
-                                  <span className="text-zinc-500 text-[10px]">{getRelativeTime(act.timestamp)}</span>
+                                  <span className="text-zinc-500 text-[10px]">{formatTime(act.timestamp)}</span>
                                 </div>
                                 <span className="text-zinc-400">{act.details}</span>
                                 <div className="text-[9px] text-zinc-500 flex flex-wrap gap-x-2">

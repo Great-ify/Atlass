@@ -8,30 +8,83 @@ const BASE_API_PATH = '/api/normies';
 export function mapApiNormieToItem(apiItem: any): NormieItem {
   const id = (apiItem.tokenId ?? apiItem.id ?? '0').toString();
   
+  const rawTraits = apiItem.attributes ?? apiItem.traits ?? [];
+  const breakdown = apiItem.traitBreakdown ?? [];
+  
+  const traits = Array.isArray(rawTraits) 
+    ? rawTraits.map((t: any) => {
+        const type = t.trait_type ?? t.traitType ?? 'Trait';
+        const val = t.value?.toString() ?? 'None';
+        
+        // Find matching trait in breakdown for exact percentage
+        const matched = Array.isArray(breakdown)
+          ? breakdown.find((b: any) => b.trait_type === type && b.value?.toString() === val)
+          : null;
+        
+        let rarityStr = 'N/A';
+        if (matched) {
+          if (matched.frequency !== undefined) {
+            rarityStr = `${parseFloat(matched.frequency.toString()).toFixed(2)}%`;
+          } else if (matched.count !== undefined) {
+            rarityStr = `${((matched.count / 10000) * 100).toFixed(2)}%`;
+          }
+        } else if (t.percent !== undefined) {
+          rarityStr = `${parseFloat(t.percent).toFixed(2)}%`;
+        } else if (t.frequency !== undefined) {
+          rarityStr = `${parseFloat(t.frequency).toFixed(2)}%`;
+        } else if (t.count !== undefined) {
+          rarityStr = `${((t.count / 10000) * 100).toFixed(2)}%`;
+        } else if (t.rarity !== undefined) {
+          rarityStr = t.rarity.toString();
+        }
+        
+        return {
+          trait_type: type,
+          value: val,
+          rarity: rarityStr,
+          ic: matched?.ic !== undefined ? parseFloat(matched.ic.toString()).toFixed(2) : undefined,
+          count: matched?.count !== undefined ? parseInt(matched.count.toString()) : undefined
+        };
+      })
+    : [];
+
   let status: NormieItem['status'] = 'Active';
-  if (apiItem.status === 'Zombie' || apiItem.zombie || apiItem.isZombie) {
+  if (apiItem.status === 'Zombie' || apiItem.zombie || apiItem.isZombie || traits.some(t => t.trait_type === 'Type' && t.value === 'Zombie')) {
     status = 'Zombie';
-  } else if (apiItem.status === 'Legendary' || apiItem.legendary || apiItem.isLegendary) {
+  } else if (apiItem.status === 'Legendary' || apiItem.legendary || apiItem.isLegendary || traits.some(t => t.trait_type === 'Legendary Canvas')) {
     status = 'Legendary';
   } else if (apiItem.status === 'Burned' || apiItem.burned || apiItem.isBurned) {
     status = 'Burned';
   }
 
-  const rawTraits = apiItem.attributes ?? apiItem.traits ?? [];
-  const traits = Array.isArray(rawTraits) 
-    ? rawTraits.map((t: any) => ({
-        trait_type: t.trait_type ?? t.traitType ?? 'Trait',
-        value: t.value?.toString() ?? 'None',
-        rarity: t.rarity?.toString() ?? (t.percent ? `${parseFloat(t.percent).toFixed(1)}%` : t.count ? `${(t.count / 100).toFixed(1)}%` : 'N/A')
-      }))
-    : [];
-
-  const rank = apiItem.rank ?? apiItem.rarityRank ?? 0;
-  const score = apiItem.score ?? apiItem.rarityScore ?? 0;
+  let rank = apiItem.rank ?? apiItem.rarityRank;
+  if (rank === undefined || rank === null) {
+    rank = 0;
+  }
+  
+  let score = apiItem.score ?? apiItem.rarityScore;
+  if (score === undefined || score === null) {
+    score = 0;
+  }
 
   let owner = apiItem.owner ?? 'Unknown';
   if (owner === '0x0000000000000000000000000000000000000000') {
     owner = 'Unknown';
+  }
+
+  // Look for Level inside the attributes list if not specified on the top level
+  let level = apiItem.level ?? apiItem.canvasLevel;
+  if (level === undefined || level === null) {
+    const lvlTrait = traits.find(t => t.trait_type === 'Level');
+    if (lvlTrait) {
+      const parsed = parseInt(lvlTrait.value);
+      if (!isNaN(parsed)) {
+        level = parsed;
+      }
+    }
+  }
+  if (level === undefined || level === null) {
+    level = 1;
   }
 
   return {
@@ -39,7 +92,7 @@ export function mapApiNormieToItem(apiItem: any): NormieItem {
     name: apiItem.name ?? `Normie #${id}`,
     imageUrl: `${BASE_API_PATH}/normie/${id}/image.png`,
     owner,
-    level: apiItem.level ?? apiItem.canvasLevel ?? 1,
+    level: parseInt(level.toString()),
     status,
     updatedAt: apiItem.updatedAt ?? 'Recently',
     score: parseFloat(parseFloat(score.toString()).toFixed(1)),
@@ -108,7 +161,6 @@ export async function fetchCustomizedEvents(limit = 15): Promise<ActivityEvent[]
       if (secondsAgo >= 86400) timeAgo = `${Math.floor(secondsAgo / 86400)}d ago`;
       else if (secondsAgo >= 3600) timeAgo = `${Math.floor(secondsAgo / 3600)}h ago`;
       else if (secondsAgo >= 60) timeAgo = `${Math.floor(secondsAgo / 60)}m ago`;
-      else if (secondsAgo > 10) timeAgo = `${secondsAgo}s ago`;
 
       return {
         id: apiEvent.id?.toString() ?? `real_act_${index}`,
@@ -225,9 +277,9 @@ export async function fetchNormieCanvasDiff(id: string): Promise<CanvasDiff | nu
     if (!res.ok) throw new Error(`Status ${res.status}`);
     const data = await res.json();
     return {
-      added: data.added ?? data.addedCount ?? 0,
-      removed: data.removed ?? data.removedCount ?? 0,
-      net: data.net ?? data.netChange ?? 0
+      added: Array.isArray(data.added) ? data.added.length : (data.addedCount ?? 0),
+      removed: Array.isArray(data.removed) ? data.removed.length : (data.removedCount ?? 0),
+      net: data.netChange ?? data.net ?? 0
     };
   } catch (err) {
     console.warn(`Failed to fetch canvas diff for normie #${id}:`, err);
@@ -258,27 +310,35 @@ export async function fetchTopTraits(): Promise<TraitStatItem[]> {
     
     if (data && typeof data === 'object') {
       Object.entries(data).forEach(([category, values]) => {
-        if (values && typeof values === 'object') {
-          Object.entries(values).forEach(([value, countObj]) => {
-            let count = 0;
-            let percent = 0.0;
-            if (typeof countObj === 'number') {
-              count = countObj;
-              percent = (count / 10000) * 100;
-            } else if (countObj && typeof countObj === 'object') {
-              const obj = countObj as any;
-              count = obj.count ?? obj.liveCount ?? 0;
-              percent = obj.percent ?? obj.percentage ?? ((count / 10000) * 100);
-            }
-            
-            // Filter out backgrounds or 'None' or common type values to get interesting traits
-            if (value !== 'None' && value !== 'Default' && category !== 'Gender' && value !== 'Human') {
-              traitList.push({
-                id: (traitId++).toString(),
-                name: value,
-                category,
-                percentage: parseFloat(percent.toFixed(1))
-              });
+        if (Array.isArray(values)) {
+          values.forEach((item: any) => {
+            if (item && typeof item === 'object' && item.value !== undefined) {
+              const value = item.value?.toString();
+              const count = item.count ?? item.liveCount ?? 0;
+              const percent = (count / 10000) * 100;
+              
+              // Filter out common or empty-like trait values to highlight interesting traits
+              if (
+                value &&
+                value !== 'None' &&
+                value !== 'Default' &&
+                value !== 'Human' &&
+                value !== 'No Glasses' &&
+                value !== 'No Hair' &&
+                value !== 'No Facial Hair' &&
+                value !== 'No Mouth Accessory' &&
+                value !== '0' &&
+                value !== 'No' &&
+                value !== 'Yes' &&
+                category !== 'Gender'
+              ) {
+                traitList.push({
+                  id: (traitId++).toString(),
+                  name: value,
+                  category,
+                  percentage: parseFloat(percent.toFixed(2))
+                });
+              }
             }
           });
         }
@@ -286,10 +346,6 @@ export async function fetchTopTraits(): Promise<TraitStatItem[]> {
     }
     
     traitList.sort((a, b) => b.percentage - a.percentage);
-    
-    if (traitList.length === 0) {
-      return [];
-    }
     
     return traitList.slice(0, 5);
   } catch (err) {
@@ -306,7 +362,7 @@ export async function fetchZombieConversions(limit = 15): Promise<ActivityEvent[
     const list = Array.isArray(data) ? data : (data.conversions || data.data || []);
     return list.map((apiEvent: any, index: number) => {
       const normieId = (apiEvent.tokenId ?? apiEvent.id ?? '0').toString();
-      const transformer = apiEvent.transformer ?? apiEvent.wallet ?? 'Unknown';
+      const transformer = apiEvent.committer ?? apiEvent.committedOwner ?? apiEvent.qualifyingWallet ?? apiEvent.transformer ?? apiEvent.wallet ?? 'Unknown';
       const timestamp = apiEvent.timestamp ? parseInt(apiEvent.timestamp) * 1000 : Date.now() - index * 120000;
       
       const secondsAgo = Math.floor((Date.now() - timestamp) / 1000);
@@ -314,7 +370,6 @@ export async function fetchZombieConversions(limit = 15): Promise<ActivityEvent[
       if (secondsAgo >= 86400) timeAgo = `${Math.floor(secondsAgo / 86400)}d ago`;
       else if (secondsAgo >= 3600) timeAgo = `${Math.floor(secondsAgo / 3600)}h ago`;
       else if (secondsAgo >= 60) timeAgo = `${Math.floor(secondsAgo / 60)}m ago`;
-      else if (secondsAgo > 10) timeAgo = `${secondsAgo}s ago`;
 
       return {
         id: apiEvent.id?.toString() ?? `zombie_act_${index}`,

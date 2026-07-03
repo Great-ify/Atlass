@@ -397,8 +397,12 @@ export default function App() {
               </button>
 
               <button 
-                onClick={() => setSearchOpen(true)}
-                className="bg-transparent hover:bg-zinc-900 border border-zinc-800 text-zinc-300 text-xs font-semibold px-5 py-2.5 rounded-md transition-all flex items-center gap-2"
+                onClick={() => {
+                  setDemoInitialTab('explore');
+                  setDemoActive(true);
+                  triggerToast('Navigating directly to app discover tab...');
+                }}
+                className="bg-transparent hover:bg-zinc-900 border border-zinc-800 text-zinc-300 text-xs font-semibold px-5 py-2.5 rounded-md transition-all flex items-center gap-2 cursor-pointer"
               >
                 <span>Discover Normies</span>
                 <Command className="w-3.5 h-3.5 text-zinc-500" />
@@ -510,15 +514,23 @@ export default function App() {
                   
                   {/* Status Indicator */}
                   <div className="mt-5 flex items-center justify-between">
-                    <span className={`text-[9px] font-mono font-semibold px-1.5 py-0.5 rounded ${
-                      m.color === 'success' ? 'bg-emerald-500/10 text-emerald-400' :
-                      m.color === 'warning' ? 'bg-amber-500/10 text-amber-400' :
-                      m.color === 'error' ? 'bg-red-500/10 text-red-400' :
-                      m.color === 'legendary' ? 'bg-purple-500/10 text-purple-400' :
-                      m.color === 'info' ? 'bg-blue-500/10 text-blue-400' :
-                      'bg-zinc-800/30 text-zinc-500'
-                    }`}>
-                      {m.change}
+                    <span className="relative flex h-1.5 w-1.5">
+                      <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${
+                        m.color === 'success' ? 'bg-emerald-400' :
+                        m.color === 'warning' ? 'bg-amber-400' :
+                        m.color === 'error' ? 'bg-red-400' :
+                        m.color === 'legendary' ? 'bg-purple-400' :
+                        m.color === 'info' ? 'bg-blue-400' :
+                        'bg-zinc-400'
+                      }`}></span>
+                      <span className={`relative inline-flex rounded-full h-1.5 w-1.5 ${
+                        m.color === 'success' ? 'bg-emerald-500' :
+                        m.color === 'warning' ? 'bg-amber-500' :
+                        m.color === 'error' ? 'bg-red-500' :
+                        m.color === 'legendary' ? 'bg-purple-500' :
+                        m.color === 'info' ? 'bg-blue-500' :
+                        'bg-zinc-500'
+                      }`}></span>
                     </span>
                   </div>
                 </motion.div>
@@ -674,13 +686,6 @@ export default function App() {
             <p className="text-[11px] text-zinc-400 leading-relaxed max-w-xs">
               The intelligence and signals tracking layer for the entire Normies ecosystem. Building decentralized real-time indexing infrastructure.
             </p>
-            <div className="flex items-center gap-4 text-xs font-mono text-zinc-500 pt-2">
-              <a href="#" className="hover:text-white transition-colors">Twitter (X)</a>
-              <span>•</span>
-              <a href="#" className="hover:text-white transition-colors">Discord</a>
-              <span>•</span>
-              <a href="#" className="hover:text-white transition-colors">GitHub</a>
-            </div>
           </div>
 
           {/* Links Cols */}

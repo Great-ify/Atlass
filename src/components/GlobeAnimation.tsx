@@ -389,7 +389,7 @@ export default function GlobeAnimation() {
         return (
           <div
             key={`card-holder-${evt.id}`}
-            className="absolute z-20 pointer-events-auto"
+            className="absolute z-20 pointer-events-auto hidden md:block"
             style={{
               transform: `translate(${evt.cardX}px, ${evt.cardY}px)`
             }}

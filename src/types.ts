@@ -8,6 +8,12 @@ export interface ActivityEvent {
   toAddress?: string;
   timeAgo: string;
   timestamp: number;
+  price?: number;
+  isReal?: boolean;
+  batchCount?: number;
+  batchIds?: string[];
+  batchType?: 'purchase' | 'listing' | 'transfer';
+  batchPriceTotal?: number;
 }
 
 export interface MetricItem {
@@ -60,4 +66,15 @@ export interface TraitStatItem {
   name: string;
   category: string;
   percentage: number;
+}
+
+export interface MarketStats {
+  floorPrice: number;
+  volume24h: number;
+  listedCount: number;
+  ownerCount: number;
+  lastSalePrice: number;
+  lastSaleTokenId: string;
+  lastSaleImage: string;
+  isReal?: boolean;
 }

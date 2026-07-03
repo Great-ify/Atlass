@@ -41,7 +41,7 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
   const [walletConnected, setWalletConnected] = useState(false);
   const [walletAddress, setWalletAddress] = useState('');
 
-  // Sync with Privy authentication state
+  // Sync with Privy authentication state. in progresss
   useEffect(() => {
     if (authenticated && user) {
       setWalletConnected(true);

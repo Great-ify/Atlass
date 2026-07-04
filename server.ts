@@ -13,11 +13,11 @@ async function startServer() {
   app.get("/api/market/stats", async (req, res) => {
     try {
       // Default live Data
-      let floorPrice = "--";
-      let volume24h = "--";
-      let listedCount =  "--";
-      let ownerCount =  "--";
-      let lastSalePrice = cachedLastSalePrice;
+      let floorPrice: string | number = "--";
+      let volume24h: string | number = "--";
+      let listedCount: string | number =  "--";
+      let ownerCount: string | number =  "--";
+      let lastSalePrice: string | number = cachedLastSalePrice !== null ? cachedLastSalePrice : "--";
       let lastSaleTokenId = "--";
       let lastSaleImage = "https://api.normies.art/normie/512/image.png";
       let isReal = false;

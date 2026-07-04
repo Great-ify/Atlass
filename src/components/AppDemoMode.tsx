@@ -973,7 +973,10 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
     const list = Object.values(walletGroups)
       .map(g => {
         const count = g.normieIds.length;
-        const spent = g.totalSpent > 0 ? g.totalSpent : (count * (marketStats?.floorPrice ?? 0.18));
+        const rawFloorPrice = marketStats?.floorPrice;
+        const numericFloor = (rawFloorPrice && rawFloorPrice !== '--') ? (typeof rawFloorPrice === 'number' ? rawFloorPrice : parseFloat(rawFloorPrice)) : 0.18;
+        const validFloor = isNaN(numericFloor) ? 0.18 : numericFloor;
+        const spent = g.totalSpent > 0 ? g.totalSpent : (count * validFloor);
         
         let actionLabel = `Acquired ${count} Normies`;
         if (g.actionTypes.has('buy') && g.actionTypes.has('list')) {
@@ -1009,14 +1012,19 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
         }
       });
       return Object.entries(ownerCounts)
-        .map(([address, ids]) => ({
-          address,
-          count: ids.length,
-          normieIds: ids,
-          spent: parseFloat((ids.length * (marketStats?.floorPrice ?? 0.18)).toFixed(2)),
-          actionLabel: `Holds ${ids.length} Normie NFTs`,
-          timestamp: Date.now() - 3600000
-        }))
+        .map(([address, ids]) => {
+          const rawFloorPrice = marketStats?.floorPrice;
+          const numericFloor = (rawFloorPrice && rawFloorPrice !== '--') ? (typeof rawFloorPrice === 'number' ? rawFloorPrice : parseFloat(rawFloorPrice)) : 0.18;
+          const validFloor = isNaN(numericFloor) ? 0.18 : numericFloor;
+          return {
+            address,
+            count: ids.length,
+            normieIds: ids,
+            spent: parseFloat((ids.length * validFloor).toFixed(2)),
+            actionLabel: `Holds ${ids.length} Normie NFTs`,
+            timestamp: Date.now() - 3600000
+          };
+        })
         .filter(w => w.count >= 4 || w.spent >= 3.0)
         .sort((a, b) => b.count - a.count)
         .slice(0, 3);
@@ -3232,7 +3240,12 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
                                     <div>
                                       <span className="text-zinc-500 text-[10px] block">Floor Price</span>
                                       <span className="text-sm font-bold font-mono text-white block">
-                                        {marketStats.floorPrice ? `${marketStats.floorPrice.toFixed(3)} ETH` : '--'}
+                                        {(() => {
+                                          const rawFloor = marketStats?.floorPrice;
+                                          if (!rawFloor || rawFloor === '--') return '--';
+                                          const numericFloor = typeof rawFloor === 'number' ? rawFloor : parseFloat(rawFloor);
+                                          return !isNaN(numericFloor) ? `${numericFloor.toFixed(3)} ETH` : '--';
+                                        })()}
                                       </span>
                                     </div>
                                     <div>

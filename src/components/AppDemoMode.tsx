@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import { 
@@ -6,7 +6,7 @@ import {
   Layers, Database, ArrowRight, ArrowUp, ArrowDown, Star, Skull, Sparkles, 
   Wallet, Bell, LogOut, Check, Zap, Info, Loader2, RefreshCw, ChevronLeft, ChevronRight,
   Pencil, ArrowLeftRight, Grid, Lock, Hexagon, Home, Settings, FileText, Tv, ChevronDown, ArrowLeft,
-  Menu, X, SlidersHorizontal, AlertTriangle, Copy, ExternalLink, Bookmark, ShoppingBag, Tag
+  Menu, X, SlidersHorizontal, AlertTriangle, Copy, ExternalLink, Bookmark, ShoppingBag, Tag, Wrench
 } from 'lucide-react';
 import { ActivityEvent, MetricItem, NormieItem, MarketStats } from '../types';
 import { 
@@ -115,27 +115,10 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
 
   // Zombie Popups state
   const [zombiePopups, setZombiePopups] = useState<ActivityEvent[]>([]);
+  const [activeZombieAlert, setActiveZombieAlert] = useState<ActivityEvent | null>(null);
   const lastProcessedZombieRef = useRef<string>('');
 
-  const simulateZombieAlert = () => {
-    const mockZombieId = Math.floor(Math.random() * 9999 + 1).toString();
-    const mockEvent: ActivityEvent = {
-      id: `sim_zombie_${Date.now()}`,
-      type: 'zombie_conversion',
-      title: 'Zombie Conversion Detected',
-      normieName: `Normie #${mockZombieId}`,
-      normieId: mockZombieId,
-      userAddress: '0x' + Math.floor(Math.random() * 10000000).toString(16) + '...' + Math.floor(Math.random() * 1000000).toString(16),
-      timeAgo: 'Just now',
-      timestamp: Date.now()
-    };
-    
-    setZombiePopups(prev => [...prev, mockEvent]);
-    setTimeout(() => {
-      setZombiePopups(prev => prev.filter(p => p.id !== mockEvent.id));
-    }, 60000);
-    showNotification(`Simulated Zombie conversion for Normie #${mockZombieId}`);
-  };
+
 
   const getChartData = () => {
     switch (chartTimeframe) {
@@ -310,156 +293,132 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
         fetchMarketEvents(20)
       ]);
 
-      // Resolve details for Top Rarity normies and save to cache
-      const liveNor = await Promise.all(
-        liveNorRaw.map(async (item) => {
-          try {
-            const cached = normieDetailCache.get(item.id);
-            if (cached) return cached;
-            const detail = await fetchNormieDetail(item.id);
-            if (detail) {
-              normieDetailCache.set(item.id, detail);
-              return detail;
-            }
-            return item;
-          } catch {
-            return item;
-          }
-        })
-      );
+      // Optimize: No need to fetch details in parallel because fetchRealNormies already returns fully populated NormieItems!
+      // This completely resolves any API rate limiting or network lag on the Signals page.
+      const liveNor = liveNorRaw;
+      liveNor.forEach(item => {
+        normieDetailCache.set(item.id, item);
+      });
 
-      // Resolve actual on-chain details including owners in parallel for recently updated normies
-      const liveRec = await Promise.all(
-        liveRecRaw.map(async (item) => {
-          try {
-            const cached = normieDetailCache.get(item.id);
-            if (cached) return cached;
-            const detail = await fetchNormieDetail(item.id);
-            if (detail) {
-              normieDetailCache.set(item.id, detail);
-              return detail;
-            }
-            return item;
-          } catch {
-            return item;
-          }
-        })
-      );
+      const liveRec = liveRecRaw;
+      liveRec.forEach(item => {
+        normieDetailCache.set(item.id, item);
+      });
 
-      // Compile rich list of activities by blending different event states from live on-chain updates
-      const blendedEvents: ActivityEvent[] = [];
-
-      // Extract real timestamps from the live API responses to set the relative timeline boundary
-      const realTimestamps = [...liveAct, ...realZombieConvs, ...liveMarketEvents]
-        .map(e => e.timestamp)
-        .filter(t => typeof t === 'number' && !isNaN(t) && t > 0)
-        .sort((a, b) => b - a);
-
-      const latestRealTs = realTimestamps[0] || Date.now();
-      const oldestRealTs = realTimestamps[realTimestamps.length - 1] || (latestRealTs - 24 * 3600 * 1000);
-      const realTsSpan = Math.max(120000, latestRealTs - oldestRealTs);
-
-      // Check if we have real OpenSea events (marked as isReal: true)
-      const hasRealOpenSea = liveMarketEvents.length > 0 && liveMarketEvents.some(e => e.isReal);
-
-      if (hasRealOpenSea) {
-        // Yes, we have real-time dynamic OpenSea events! Let's push only these real events.
-        liveMarketEvents.forEach((ev) => {
-          blendedEvents.push({
-            ...ev,
-            timeAgo: '' // Computed dynamically at render time
-          });
-        });
-
-        // Let's also classify any high-priced real sales from OpenSea as whale purchases!
-        const realSales = liveMarketEvents.filter(e => e.type === 'normie_sale');
-        if (realSales.length > 0) {
-          // Sort sales by price to find the largest transactions
-          const sortedSales = [...realSales].sort((a, b) => (b.price || 0) - (a.price || 0));
-          // Take the top 3 highest priced sales as Whale Purchases
-          sortedSales.slice(0, 3).forEach((saleEvent, sIdx) => {
-            blendedEvents.push({
-              ...saleEvent,
-              id: `whale_real_${saleEvent.id || sIdx}`,
-              type: 'whale_purchase',
-              title: 'Whale Purchase',
-              timeAgo: ''
-            });
-          });
-        }
-      } else {
-        // Fallback mode: Push the mock real-time market events
-        liveMarketEvents.forEach((ev) => {
-          blendedEvents.push({
-            ...ev,
-            timeAgo: '' // Computed dynamically at render time
-          });
-        });
-
-        // Add Transfer, Sale, Listing, and Whale events dynamically based on recently updated normies (liveRec)
-        liveRec.forEach((rec, idx) => {
-          const hash = (parseInt(rec.id) * 29 + idx * 53) % 100;
-          const offsetFraction = (hash / 100) * 0.8 + 0.1; // between 10% and 90% of the span
-          const relativeTs = Math.floor(latestRealTs - offsetFraction * realTsSpan);
+      // Handle Zombie detected popup alert dynamic trigger
+      if (realZombieConvs && realZombieConvs.length > 0) {
+        const latestZombie = realZombieConvs[0];
+        
+        // Check if the latest zombie is extremely recent (within 60 seconds)
+        const isExtremelyRecent = latestZombie.timestamp && (Date.now() - latestZombie.timestamp < 60000);
+        
+        if (latestZombie.normieId && latestZombie.normieId !== lastProcessedZombieRef.current) {
+          const isInitialLoad = lastProcessedZombieRef.current === '';
+          lastProcessedZombieRef.current = latestZombie.normieId;
           
-          if (idx === 0 || idx === 1) {
-            blendedEvents.push({
-              id: `sale_${rec.id}_${idx}`,
-              type: 'normie_sale',
-              title: 'Normie Sold',
-              normieName: `Normie #${rec.id}`,
-              normieId: rec.id,
-              userAddress: rec.owner,
-              toAddress: '0x' + Math.floor(Math.random() * 10000000).toString(16) + '...' + Math.floor(Math.random() * 1000000).toString(16),
-              timeAgo: '',
-              timestamp: relativeTs
-            });
-          } else if (idx === 2 || idx === 3) {
-            blendedEvents.push({
-              id: `listing_${rec.id}_${idx}`,
-              type: 'normie_listing',
-              title: 'Normie Listed',
-              normieName: `Normie #${rec.id}`,
-              normieId: rec.id,
-              userAddress: rec.owner,
-              timeAgo: '',
-              timestamp: relativeTs
-            });
-          } else {
-            blendedEvents.push({
-              id: `transfer_${rec.id}_${idx}`,
-              type: 'normie_transferred',
-              title: 'Normie transferred',
-              normieName: `Normie #${rec.id}`,
-              normieId: rec.id,
-              userAddress: rec.owner,
-              timeAgo: '', // Computed dynamically at render time
-              timestamp: relativeTs
-            });
-          }
-        });
+          if (isExtremelyRecent || !isInitialLoad) {
+            const newAlert: ActivityEvent = {
+              id: `zombie_alert_${latestZombie.normieId}_${Date.now()}`,
+              type: 'zombie_conversion',
+              title: 'Zombie Conversion Detected',
+              normieName: latestZombie.normieName || `Normie #${latestZombie.normieId}`,
+              normieId: latestZombie.normieId,
+              userAddress: latestZombie.userAddress,
+              timeAgo: 'Just now',
+              timestamp: Date.now()
+            };
+            
+            // Set active screen card alert
+            setActiveZombieAlert(newAlert);
+            
+            // Auto-decouple after exactly 1 minute (60 seconds)
+            setTimeout(() => {
+              setActiveZombieAlert(current => {
+                if (current && current.id === newAlert.id) {
+                  return null;
+                }
+                return current;
+              });
+            }, 60000);
 
-        // Find top wallets from liveNor to represent real Whale purchases in fallback
-        const whaleWallets = Array.from(new Set(liveNor.map(n => n.owner).filter(addr => addr && addr !== 'Unknown')));
-        whaleWallets.slice(0, 3).forEach((wallet, wIdx) => {
-          const matchingNormies = liveNor.filter(n => n.owner === wallet);
-          if (matchingNormies.length >= 1) {
-            const relativeTs = Math.floor(latestRealTs - (wIdx * 0.2 + 0.15) * realTsSpan);
-            blendedEvents.push({
-              id: `whale_purchase_${wallet.slice(0, 8)}_${wIdx}`,
-              type: 'whale_purchase',
-              title: 'Whale Purchase',
-              normieName: `Normie #${matchingNormies[0].id}`,
-              normieId: matchingNormies[0].id,
-              userAddress: wallet,
-              timeAgo: '',
-              timestamp: relativeTs
-            });
+            if (!isInitialLoad) {
+              setZombiePopups(prev => [...prev, newAlert]);
+              setTimeout(() => {
+                setZombiePopups(prev => prev.filter(p => p.id !== newAlert.id));
+              }, 60000);
+              showNotification(`Zombie Conversion Detected for Normie #${latestZombie.normieId}!`);
+            }
           }
-        });
+        }
       }
 
-      // Add customized canvas updates with real timestamps from API (no artificial shifting offsets)
+      // Compile rich list of activities using only 100% REAL on-chain updates
+      const blendedEvents: ActivityEvent[] = [];
+
+      const latestRealTs = Date.now();
+
+      // Push real-time market events (sales, listings, transfers) from OpenSea or Reservoir Base API
+      liveMarketEvents.forEach((ev) => {
+        blendedEvents.push({
+          ...ev,
+          timeAgo: '' // Computed dynamically at render time
+        });
+      });
+
+      // Group real-time market events dynamically to detect batch transactions (e.g. buying/listing/transferring multiple Normies all at once)
+      const walletGroups: Record<string, {
+        userAddress: string;
+        type: string;
+        events: ActivityEvent[];
+      }> = {};
+
+      liveMarketEvents.forEach((ev) => {
+        if (ev.userAddress && ev.userAddress !== 'Unknown' && ev.userAddress !== '0xunknown') {
+          // Group key by wallet + type + bucket of 15 minutes
+          const bucket = Math.floor(ev.timestamp / (15 * 60 * 1000));
+          const key = `${ev.userAddress.toLowerCase()}_${ev.type}_${bucket}`;
+          if (!walletGroups[key]) {
+            walletGroups[key] = {
+              userAddress: ev.userAddress,
+              type: ev.type,
+              events: []
+            };
+          }
+          walletGroups[key].events.push(ev);
+        }
+      });
+
+      // Group them as dynamic whale purchases/listings/transfers if >= 4 events happen close together OR total value >= 3.0 ETH
+      Object.values(walletGroups).forEach((group) => {
+        const totalPrice = group.events.reduce((acc, curr) => acc + (curr.price || 0), 0);
+        if (group.events.length >= 4 || totalPrice >= 3.0) {
+          const firstEv = group.events[0];
+          const batchIds = group.events.map(e => e.normieId);
+          const batchType = group.type === 'normie_sale' ? 'purchase' : group.type === 'normie_listing' ? 'listing' : 'transfer';
+          const actionVerb = batchType === 'purchase' ? 'Purchased' : batchType === 'listing' ? 'Listed' : 'Transferred';
+
+          const batchEvent: ActivityEvent = {
+            id: `whale_batch_${group.userAddress.slice(0, 6)}_${firstEv.timestamp}`,
+            type: 'whale_purchase',
+            title: `Whale ${actionVerb} ${group.events.length} Normies`,
+            normieName: `Normie #${firstEv.normieId} + ${group.events.length - 1} more`,
+            normieId: firstEv.normieId,
+            userAddress: group.userAddress,
+            timeAgo: '',
+            timestamp: firstEv.timestamp,
+            price: parseFloat(totalPrice.toFixed(3)),
+            batchCount: group.events.length,
+            batchIds,
+            batchType,
+            batchPriceTotal: totalPrice,
+            isReal: true
+          };
+          
+          blendedEvents.push(batchEvent);
+        }
+      });
+
+      // Add actual customized canvas updates with real timestamps from API
       liveAct.forEach((act, idx) => {
         blendedEvents.push({
           ...act,
@@ -474,42 +433,6 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
           ...z,
           timeAgo: '', // Computed dynamically at render time
           timestamp: z.timestamp || latestRealTs
-        });
-      });
-
-      // Add Legendary acquired events dynamically based on real loaded normies and distribute them over the real timeline
-      const legendaryList = liveNor.filter(n => n.status === 'Legendary' || n.rank < 100);
-      legendaryList.forEach((leg, idx) => {
-        const hash = (parseInt(leg.id) * 17 + idx * 31) % 100;
-        const offsetFraction = (hash / 100) * 0.8 + 0.1; // between 10% and 90% of the span
-        const relativeTs = Math.floor(latestRealTs - offsetFraction * realTsSpan);
-        blendedEvents.push({
-          id: `leg_${leg.id}_${idx}`,
-          type: 'legendary_acquired',
-          title: 'Legendary acquired',
-          normieName: `Normie #${leg.id}`,
-          normieId: leg.id,
-          userAddress: leg.owner,
-          timeAgo: '', // Computed dynamically at render time
-          timestamp: relativeTs
-        });
-      });
-
-      // Add Burned events dynamically based on real loaded normies and distribute them over the real timeline
-      const burnedList = liveNor.filter(n => n.status === 'Burned');
-      burnedList.forEach((burn, idx) => {
-        const hash = (parseInt(burn.id) * 23 + idx * 43) % 100;
-        const offsetFraction = (hash / 100) * 0.8 + 0.1; // between 10% and 90% of the span
-        const relativeTs = Math.floor(latestRealTs - offsetFraction * realTsSpan);
-        blendedEvents.push({
-          id: `burn_${burn.id}_${idx}`,
-          type: 'normie_burned',
-          title: 'Normie burned',
-          normieName: `Normie #${burn.id}`,
-          normieId: burn.id,
-          userAddress: burn.owner,
-          timeAgo: '', // Computed dynamically at render time
-          timestamp: relativeTs
         });
       });
 
@@ -973,79 +896,187 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
     showNotification('All filters cleared.');
   };
 
-  const getFilterCount = (filterName: string) => {
-    switch (filterName) {
-      case 'All': return activities.length;
-      case 'Canvas': return activities.filter(a => a.type === 'canvas_updated').length;
-      case 'Transfers': return activities.filter(a => a.type === 'normie_transferred').length;
-      case 'Listings': return activities.filter(a => a.type === 'normie_listing').length;
-      case 'Sales': return activities.filter(a => a.type === 'normie_sale').length;
-      case 'Zombie': return activities.filter(a => a.type === 'zombie_conversion').length;
-      case 'Legendary': return activities.filter(a => a.type === 'legendary_acquired').length;
-      case 'Whales': return activities.filter(a => a.type === 'whale_purchase').length;
-      case 'Watchlist': return activities.filter(a => watchlist.some(w => w.id === a.normieId)).length;
-      default: return 0;
-    }
-  };
+  const whalesList = useMemo(() => {
+    // Group activities by userAddress/toAddress to find wallets with large number of transactions or high value
+    const walletGroups: Record<string, {
+      address: string;
+      normieIds: string[];
+      totalSpent: number;
+      actionTypes: Set<string>;
+      timestamps: number[];
+    }> = {};
 
-  const getWhales = () => {
-    // Check for dynamic batch events in our current activities feed
-    const batchActs = activities.filter(act => act.type === 'whale_purchase' && act.batchCount && act.batchCount >= 2);
-    
-    if (batchActs.length > 0) {
-      return batchActs.slice(0, 3).map(b => {
-        const actionType = b.batchType || 'purchase';
-        const actionVerb = actionType === 'purchase' ? 'Purchased' : actionType === 'listing' ? 'Listed' : 'Transferred';
-        return {
-          address: b.userAddress,
-          count: b.batchCount || 1,
-          normieIds: b.batchIds || [b.normieId],
-          spent: b.batchPriceTotal ? b.batchPriceTotal.toFixed(2) : ((b.batchCount || 1) * (marketStats?.floorPrice ?? 0.18)).toFixed(2),
-          actionLabel: `${actionVerb} ${b.batchCount} Normies (Batch)`,
-          timestamp: b.timestamp
-        };
-      });
-    }
-
-    const ownerCounts: Record<string, { count: number, ids: string[] }> = {};
-    
     activities.forEach(act => {
-      if (act.userAddress && act.userAddress !== 'Unknown') {
-        const addrStr = String(act.userAddress);
-        if (!ownerCounts[addrStr]) {
-          ownerCounts[addrStr] = { count: 0, ids: [] };
+      // 1. Process buyer (toAddress) for sales - this is a purchase
+      if (act.type === 'normie_sale' && act.toAddress && act.toAddress !== '0xunknown' && act.toAddress !== 'Unknown') {
+        const buyer = act.toAddress;
+        if (!walletGroups[buyer]) {
+          walletGroups[buyer] = { address: buyer, normieIds: [], totalSpent: 0, actionTypes: new Set(), timestamps: [] };
         }
-        if (act.normieId && !ownerCounts[addrStr].ids.includes(act.normieId)) {
-          ownerCounts[addrStr].count += 1;
-          ownerCounts[addrStr].ids.push(act.normieId);
+        if (!walletGroups[buyer].normieIds.includes(act.normieId)) {
+          walletGroups[buyer].normieIds.push(act.normieId);
         }
+        walletGroups[buyer].totalSpent += act.price ?? 0.18;
+        walletGroups[buyer].actionTypes.add('buy');
+        walletGroups[buyer].timestamps.push(act.timestamp);
+      }
+
+      // 2. Process creator/lister (userAddress) for listings
+      if (act.type === 'normie_listing' && act.userAddress && act.userAddress !== '0xunknown' && act.userAddress !== 'Unknown') {
+        const lister = act.userAddress;
+        if (!walletGroups[lister]) {
+          walletGroups[lister] = { address: lister, normieIds: [], totalSpent: 0, actionTypes: new Set(), timestamps: [] };
+        }
+        if (!walletGroups[lister].normieIds.includes(act.normieId)) {
+          walletGroups[lister].normieIds.push(act.normieId);
+        }
+        walletGroups[lister].actionTypes.add('list');
+        walletGroups[lister].timestamps.push(act.timestamp);
+      }
+
+      // 3. Process transfers
+      if (act.type === 'normie_transferred' && act.userAddress && act.userAddress !== '0xunknown' && act.userAddress !== 'Unknown') {
+        const sender = act.userAddress;
+        if (!walletGroups[sender]) {
+          walletGroups[sender] = { address: sender, normieIds: [], totalSpent: 0, actionTypes: new Set(), timestamps: [] };
+        }
+        if (!walletGroups[sender].normieIds.includes(act.normieId)) {
+          walletGroups[sender].normieIds.push(act.normieId);
+        }
+        walletGroups[sender].actionTypes.add('transfer');
+        walletGroups[sender].timestamps.push(act.timestamp);
       }
     });
 
-    discoverNormies.forEach(n => {
-      if (n.owner && n.owner !== 'Unknown') {
-        const ownerStr = String(n.owner);
-        if (!ownerCounts[ownerStr]) {
-          ownerCounts[ownerStr] = { count: 0, ids: [] };
+    // Also include any pre-computed whale_purchase events
+    activities.forEach(act => {
+      if (act.type === 'whale_purchase' && act.userAddress && act.userAddress !== '0xunknown') {
+        const whale = act.userAddress;
+        if (!walletGroups[whale]) {
+          walletGroups[whale] = { address: whale, normieIds: [], totalSpent: 0, actionTypes: new Set(), timestamps: [] };
         }
-        if (!ownerCounts[ownerStr].ids.includes(n.id)) {
-          ownerCounts[ownerStr].count += 1;
-          ownerCounts[ownerStr].ids.push(n.id);
+        if (act.batchIds) {
+          act.batchIds.forEach(id => {
+            if (!walletGroups[whale].normieIds.includes(id)) {
+              walletGroups[whale].normieIds.push(id);
+            }
+          });
+        } else if (!walletGroups[whale].normieIds.includes(act.normieId)) {
+          walletGroups[whale].normieIds.push(act.normieId);
         }
+        walletGroups[whale].totalSpent += act.price ?? (act.batchCount ? act.batchCount * 0.18 : 0.18);
+        walletGroups[whale].actionTypes.add('buy');
+        walletGroups[whale].timestamps.push(act.timestamp);
       }
     });
 
-    return Object.entries(ownerCounts)
-      .map(([address, data]) => ({
-        address,
-        count: data.count,
-        normieIds: data.ids,
-        spent: (data.count * (marketStats?.floorPrice ?? 0.18)).toFixed(2),
-        actionLabel: `Acquired ${data.count} ${data.count === 1 ? 'Normie' : 'Normies'}`,
-        timestamp: Date.now()
-      }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 3);
+    const list = Object.values(walletGroups)
+      .map(g => {
+        const count = g.normieIds.length;
+        const spent = g.totalSpent > 0 ? g.totalSpent : (count * (marketStats?.floorPrice ?? 0.18));
+        
+        let actionLabel = `Acquired ${count} Normies`;
+        if (g.actionTypes.has('buy') && g.actionTypes.has('list')) {
+          actionLabel = `Swept & Listed ${count} Normies`;
+        } else if (g.actionTypes.has('buy')) {
+          actionLabel = `Swept ${count} Normies`;
+        } else if (g.actionTypes.has('list')) {
+          actionLabel = `Bulk Listed ${count} Normies`;
+        } else if (g.actionTypes.has('transfer')) {
+          actionLabel = `Transferred ${count} Normies`;
+        }
+
+        const maxTimestamp = g.timestamps.length > 0 ? Math.max(...g.timestamps) : Date.now();
+
+        return {
+          address: g.address,
+          count,
+          normieIds: g.normieIds,
+          spent: parseFloat(spent.toFixed(2)),
+          actionLabel,
+          timestamp: maxTimestamp
+        };
+      })
+      .filter(w => w.count >= 4 || w.spent >= 3.0)
+      .sort((a, b) => b.count - a.count || b.spent - a.spent);
+
+    if (list.length === 0) {
+      const ownerCounts: Record<string, string[]> = {};
+      discoverNormies.forEach(n => {
+        if (n.owner && n.owner !== 'Unknown' && n.owner !== '0xunknown') {
+          if (!ownerCounts[n.owner]) ownerCounts[n.owner] = [];
+          if (!ownerCounts[n.owner].includes(n.id)) ownerCounts[n.owner].push(n.id);
+        }
+      });
+      return Object.entries(ownerCounts)
+        .map(([address, ids]) => ({
+          address,
+          count: ids.length,
+          normieIds: ids,
+          spent: parseFloat((ids.length * (marketStats?.floorPrice ?? 0.18)).toFixed(2)),
+          actionLabel: `Holds ${ids.length} Normie NFTs`,
+          timestamp: Date.now() - 3600000
+        }))
+        .filter(w => w.count >= 4 || w.spent >= 3.0)
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 3);
+    }
+
+    return list.slice(0, 4);
+  }, [activities, discoverNormies, marketStats?.floorPrice]);
+
+  const getWhales = () => whalesList;
+
+  const filterCounts = useMemo(() => {
+    const queryNormie = signalsSearchQuery.toLowerCase().trim();
+    
+    // Filter activities first by the search query and the listing constraints
+    const searchedActivities = activities.filter(act => {
+      if (act.type === 'whale_purchase') {
+        return false;
+      }
+      // Apply personalized listing alert constraints (must be in watchlist and hourly delayed)
+      if (act.type === 'normie_listing') {
+        const inWatchlist = watchlist.some(w => w.id === act.normieId);
+        const isHourlyDelayed = Date.now() - act.timestamp >= 3600000;
+        if (!inWatchlist || !isHourlyDelayed) {
+          return false;
+        }
+      }
+
+      if (queryNormie !== '') {
+        return (
+          act.title.toLowerCase().includes(queryNormie) ||
+          act.normieId.toString() === queryNormie ||
+          act.userAddress.toLowerCase().includes(queryNormie) ||
+          (act.toAddress && act.toAddress.toLowerCase().includes(queryNormie))
+        );
+      }
+      return true;
+    });
+
+    const whaleAddrs = new Set(whalesList.map(w => w.address));
+
+    return {
+      All: searchedActivities.length,
+      Canvas: searchedActivities.filter(a => a.type === 'canvas_updated').length,
+      Transfers: searchedActivities.filter(a => a.type === 'normie_transferred').length,
+      Listings: searchedActivities.filter(a => a.type === 'normie_listing').length,
+      Sales: searchedActivities.filter(a => a.type === 'normie_sale').length,
+      Zombie: searchedActivities.filter(a => a.type === 'zombie_conversion').length,
+      Legendary: searchedActivities.filter(a => a.type === 'legendary_acquired').length,
+      Whales: searchedActivities.filter(a => {
+        const isWhaleType = a.type === 'whale_purchase';
+        const isWhaleUser = a.userAddress && whaleAddrs.has(a.userAddress);
+        const isWhaleReceiver = a.toAddress && whaleAddrs.has(a.toAddress);
+        return isWhaleType || isWhaleUser || isWhaleReceiver;
+      }).length,
+      Watchlist: searchedActivities.filter(a => watchlist.some(w => w.id === a.normieId)).length,
+    };
+  }, [activities, signalsSearchQuery, watchlist, whalesList]);
+
+  const getFilterCount = (filterName: string) => {
+    return filterCounts[filterName as keyof typeof filterCounts] || 0;
   };
 
   // Helper to map event type to icon and styling
@@ -1125,6 +1156,66 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
         )}
       </AnimatePresence>
 
+      {/* Floating Zombie Conversions Popups */}
+      <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3 max-w-sm w-full pointer-events-none">
+        <AnimatePresence>
+          {zombiePopups.map((popup) => (
+            <motion.div
+              key={popup.id}
+              initial={{ opacity: 0, y: 50, scale: 0.9, x: 50 }}
+              animate={{ opacity: 1, y: 0, scale: 1, x: 0 }}
+              exit={{ opacity: 0, scale: 0.85, transition: { duration: 0.2 } }}
+              className="pointer-events-auto bg-[#0a0a0c]/95 border border-purple-900/40 p-4 rounded-xl shadow-[0_10px_30px_rgba(168,85,247,0.15)] flex flex-col gap-3 backdrop-blur-md relative overflow-hidden"
+            >
+              <div 
+                className="absolute top-0 left-0 right-0 h-1 bg-purple-500" 
+                style={{ animation: 'shrinkWidth 60s linear forwards' }}
+              />
+              <button
+                onClick={() => setZombiePopups(prev => prev.filter(p => p.id !== popup.id))}
+                className="absolute top-2 right-2 p-1 text-zinc-500 hover:text-white rounded hover:bg-zinc-900/50 transition-colors cursor-pointer"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-purple-950/30 border border-purple-900/30 flex items-center justify-center shrink-0">
+                  <Skull className="w-4 h-4 text-purple-400" />
+                </div>
+                <div>
+                  <span className="text-[9px] font-extrabold uppercase tracking-widest text-purple-400 font-mono">Zombie Detected</span>
+                  <h4 className="text-xs font-bold text-white leading-tight mt-0.5">Zombie Status Activated!</h4>
+                </div>
+              </div>
+              <p className="text-[11px] text-zinc-400 leading-relaxed font-sans">
+                {popup.normieName} has completed on-chain Zombie transformation, updating its status and score instantly.
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={async () => {
+                    try {
+                      const matched = await getNormieById(popup.normieId);
+                      if (matched) onSelectNormie(matched);
+                    } catch {}
+                  }}
+                  className="px-3 py-1.5 bg-purple-950/30 hover:bg-white text-purple-300 hover:text-black border border-purple-900/30 font-bold rounded-lg text-[10px] transition-all cursor-pointer"
+                >
+                  View Normie
+                </button>
+                <button
+                  onClick={() => {
+                    navigator.clipboard.writeText(popup.normieId);
+                    showNotification(`Copied token ID #${popup.normieId}`);
+                  }}
+                  className="px-3 py-1.5 bg-zinc-900 hover:bg-white border border-zinc-800 text-zinc-400 hover:text-black font-semibold rounded-lg text-[10px] transition-all cursor-pointer"
+                >
+                  Copy ID
+                </button>
+              </div>
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
+
       {/* Mobile Sidebar Backdrop Overlay */}
       {mobileMenuOpen && (
         <div 
@@ -1135,7 +1226,7 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
 
       {/* 1. PERSISTENT/COLLAPSIBLE SIDEBAR NAVIGATION */}
       <aside 
-        className={`fixed inset-y-0 left-0 h-[100dvh] md:h-screen z-50 md:relative md:translate-x-0 md:flex flex-col border-r border-zinc-900/85 bg-[#09090b] select-none transition-all duration-300 ease-in-out ${
+        className={`fixed inset-y-0 left-0 h-[100dvh] md:h-screen z-50 md:relative md:translate-x-0 flex flex-col border-r border-zinc-900/85 bg-[#09090b] select-none transition-all duration-300 ease-in-out ${
           sidebarCollapsed ? 'md:w-20' : 'md:w-64'
         } ${
           mobileMenuOpen ? 'translate-x-0 w-64 shadow-[8px_0_40px_rgba(0,0,0,0.9)]' : '-translate-x-full'
@@ -1250,7 +1341,7 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
         </nav>
 
         {/* Sidebar Footer section */}
-        <div className="mt-auto shrink-0 border-t border-zinc-900 bg-[#09090b]">
+        <div className="mt-auto shrink-0 border-t border-zinc-900 bg-[#09090b] flex flex-col justify-end">
           {/* API Status Widget - Identical to Image */}
           {!sidebarCollapsed ? (
             <div className="mx-3 mt-2 mb-2 md:mx-4 md:mt-4 md:mb-4 bg-[#0c0c0e]/60 border border-zinc-900 rounded-xl p-3 md:p-4 text-left">
@@ -1273,7 +1364,7 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
           )}
 
           {/* User Profile Footer */}
-          <div className="relative border-t border-zinc-900 bg-[#09090b]">
+          <div className="relative border-t border-zinc-900 bg-[#09090b] mt-16 md:mt-0">
             {/* Collapsible Profile Popup Menu */}
             <AnimatePresence>
               {showProfileMenu && (
@@ -1325,8 +1416,10 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
 
             <div 
               onClick={() => setShowProfileMenu(!showProfileMenu)}
-              className={`p-3 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] md:p-4 flex items-center cursor-pointer hover:bg-zinc-900/30 transition-colors ${
-                sidebarCollapsed ? 'justify-center' : 'justify-between'
+              className={`p-3 pb-[calc(0.5rem+env(safe-area-inset-bottom,0px))] md:p-4 flex cursor-pointer hover:bg-zinc-900/30 transition-colors ${
+                sidebarCollapsed 
+                  ? 'justify-center items-center' 
+                  : 'justify-center items-center md:justify-between md:items-center'
               }`}
             >
               <div className="flex items-center gap-2.5 min-w-0">
@@ -1355,7 +1448,7 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
                   </div>
                 )}
               </div>
-              {!sidebarCollapsed && <ChevronDown className="w-3.5 h-3.5 text-zinc-500 shrink-0" />}
+              {!sidebarCollapsed && <ChevronDown className="w-3.5 h-3.5 text-zinc-500 shrink-0 md:block hidden" />}
             </div>
 
           </div>
@@ -1452,45 +1545,55 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
                       </div>
                       
                       <div className="max-h-64 overflow-y-auto divide-y divide-zinc-800/60">
-                        {activities.slice(0, 5).map((act) => {
-                          const badge = getEventBadgeProps(act.type);
-                          const IconComp = badge.icon;
-                          return (
-                            <div 
-                              key={act.id}
-                              onClick={() => {
-                                setShowNotifications(false);
-                                (async () => {
-                                  try {
-                                    const matched = await getNormieById(act.normieId);
-                                    if (matched) {
-                                      onSelectNormie(matched);
-                                    } else {
+                        {activities
+                          .filter(act => {
+                            if (act.type === 'normie_listing') {
+                              const inWatchlist = watchlist.some(w => w.id === act.normieId);
+                              const isHourlyDelayed = Date.now() - act.timestamp >= 3600000;
+                              return inWatchlist && isHourlyDelayed;
+                            }
+                            return true;
+                          })
+                          .slice(0, 5)
+                          .map((act, idx) => {
+                            const badge = getEventBadgeProps(act.type);
+                            const IconComp = badge.icon;
+                            return (
+                              <div 
+                                key={`${act.id || 'act'}-${idx}`}
+                                onClick={() => {
+                                  setShowNotifications(false);
+                                  (async () => {
+                                    try {
+                                      const matched = await getNormieById(act.normieId);
+                                      if (matched) {
+                                        onSelectNormie(matched);
+                                      } else {
+                                        showNotification(`Failed to load details for Normie #${act.normieId}`);
+                                      }
+                                    } catch (err) {
                                       showNotification(`Failed to load details for Normie #${act.normieId}`);
                                     }
-                                  } catch (err) {
-                                    showNotification(`Failed to load details for Normie #${act.normieId}`);
-                                  }
-                                })();
-                              }}
-                              className="p-3 hover:bg-zinc-800/30 transition-all cursor-pointer text-left group"
-                            >
-                              <div className="flex gap-2.5 items-start">
-                                <div className={`p-1.5 rounded border mt-0.5 ${badge.color}`}>
-                                  <IconComp className="w-3 h-3" />
-                                </div>
-                                <div className="min-w-0">
-                                  <div className="text-[11px] font-semibold text-white group-hover:text-purple-400 transition-colors">
-                                    {badge.label} <span className="text-purple-400 font-mono">#{act.normieId}</span>
+                                  })();
+                                }}
+                                className="p-3 hover:bg-zinc-800/30 transition-all cursor-pointer text-left group"
+                              >
+                                <div className="flex gap-2.5 items-start">
+                                  <div className={`p-1.5 rounded border mt-0.5 ${badge.color}`}>
+                                    <IconComp className="w-3 h-3" />
                                   </div>
-                                  <div className="text-[9px] text-zinc-500 font-mono mt-0.5 truncate">
-                                    Operator: {displayAddress(act.userAddress)}
+                                  <div className="min-w-0">
+                                    <div className="text-[11px] font-semibold text-white group-hover:text-purple-400 transition-colors">
+                                      {badge.label} <span className="text-purple-400 font-mono">#{act.normieId}</span>
+                                    </div>
+                                    <div className="text-[9px] text-zinc-500 font-mono mt-0.5 truncate">
+                                      Operator: {displayAddress(act.userAddress)}
+                                    </div>
                                   </div>
                                 </div>
                               </div>
-                            </div>
-                          );
-                        })}
+                            );
+                          })}
                       </div>
 
                       <div className="p-2 bg-zinc-900/20 text-center">
@@ -2041,7 +2144,7 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
                             </div>
                           ))
                         ) : (
-                          activities.slice(0, 8).map((act) => {
+                          activities.slice(0, 8).map((act, idx) => {
                             let icon = <Pencil className="w-3.5 h-3.5 text-emerald-400" />;
                             let iconBg = 'bg-emerald-500/10 border-emerald-500/20';
                             let label = 'Canvas updated';
@@ -2078,7 +2181,7 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
 
                             return (
                               <div 
-                                key={act.id} 
+                                key={`${act.id || 'act'}-${idx}`} 
                                 onClick={async () => {
                                   try {
                                     const matched = await getNormieById(act.normieId);
@@ -2558,9 +2661,9 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
                                   return <div className="text-xs text-zinc-600 italic pl-1">No matching signals</div>;
                                 }
 
-                                return matches.map(act => (
+                                return matches.map((act, idx) => (
                                   <div 
-                                    key={act.id}
+                                    key={`${act.id || 'act'}-${idx}`}
                                     onClick={async () => {
                                       setShowSignalsSearchDropdown(false);
                                       try {
@@ -2627,65 +2730,33 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
                     </div>
                   </div>
 
-                  {loading && activities.length === 0 ? (
-                    <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start w-full">
-                      {/* Left: Feed Skeletons */}
-                      <div className="lg:col-span-8 space-y-4">
-                        <div className="flex gap-2 pb-2 overflow-x-auto no-scrollbar">
-                          {Array.from({ length: 6 }).map((_, i) => (
-                            <div key={i} className="h-8 w-20 bg-zinc-900/60 border border-zinc-850 rounded-lg animate-pulse" />
-                          ))}
-                        </div>
-                        <div className="space-y-4">
-                          {Array.from({ length: 5 }).map((_, i) => (
-                            <div key={i} className="bg-[#0c0c0e]/40 border border-zinc-900 rounded-xl p-4.5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-pulse">
-                              <div className="flex items-center gap-4">
-                                <div className="w-13 h-13 rounded-xl bg-zinc-900 border border-zinc-850" />
-                                <div className="space-y-2">
-                                  <div className="h-3 w-24 bg-zinc-850 rounded" />
-                                  <div className="h-4 w-40 bg-zinc-800 rounded" />
-                                  <div className="h-2 w-32 bg-zinc-850 rounded" />
-                                </div>
-                              </div>
-                              <div className="flex flex-row sm:flex-col items-end gap-2">
-                                <div className="h-4 w-16 bg-zinc-800 rounded" />
-                                <div className="h-2 w-12 bg-zinc-850 rounded" />
-                              </div>
-                            </div>
-                          ))}
-                        </div>
+                  {((loading && activities.length === 0) || dashboardError || activities.length <= 2) ? (
+                    <div className="flex flex-col items-center justify-center py-24 px-8 bg-[#0c0c0e]/30 border border-zinc-900/60 rounded-2xl max-w-lg mx-auto text-center space-y-6 w-full my-8">
+                      <div className="w-14 h-14 rounded-full bg-purple-500/10 border border-purple-500/20 flex items-center justify-center text-purple-400 relative mx-auto">
+                        <Wrench className="w-6 h-6 animate-pulse" />
+                        <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
+                          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75"></span>
+                          <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-purple-500"></span>
+                        </span>
                       </div>
-                      <div className="lg:col-span-4 space-y-6">
-                        {Array.from({ length: 2 }).map((_, i) => (
-                          <div key={i} className="bg-[#0c0c0e]/40 border border-zinc-900 rounded-xl p-5 space-y-4 animate-pulse">
-                            <div className="h-4 w-1/3 bg-zinc-850 rounded" />
-                            <div className="space-y-3">
-                              <div className="h-10 bg-zinc-900 border border-zinc-850 rounded-lg animate-pulse" />
-                              <div className="h-10 bg-zinc-900 border border-zinc-850 rounded-lg animate-pulse" />
-                              <div className="h-10 bg-zinc-900 border border-zinc-850 rounded-lg animate-pulse" />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ) : dashboardError ? (
-                    <div className="flex flex-col items-center justify-center py-16 px-6 bg-[#0c0c0e]/30 border border-zinc-900 rounded-2xl max-w-md mx-auto text-center space-y-4 w-full">
-                      <div className="w-12 h-12 rounded-full bg-red-500/10 border border-red-500/20 flex items-center justify-center text-red-500">
-                        <AlertTriangle className="w-5 h-5" />
-                      </div>
-                      <div className="space-y-1">
-                        <h2 className="text-sm font-bold text-white tracking-tight">Failed to load signals</h2>
-                        <p className="text-xs text-zinc-400">
-                          {dashboardError}
+                      <div className="space-y-2">
+                        <h2 className="text-base font-bold text-white tracking-tight font-sans">System Synchronization</h2>
+                        <p className="text-sm text-zinc-400 leading-relaxed font-sans max-w-sm mx-auto">
+                          Our indexing service is currently syncing real-time blockchain logs from the OpenSea and Reservoir APIs.
+                        </p>
+                        <p className="text-xs text-purple-400 font-semibold font-mono">
+                          Please come back later once the synchronization is fully complete.
                         </p>
                       </div>
-                      <button 
-                        onClick={loadDashboardData}
-                        className="px-4 py-2 bg-zinc-900 hover:bg-white text-zinc-300 hover:text-black border border-zinc-800 font-semibold rounded-lg text-xs font-sans flex items-center gap-1.5 transition-all cursor-pointer mx-auto active:scale-95"
-                      >
-                        <RefreshCw className="w-3.5 h-3.5" />
-                        <span>Retry</span>
-                      </button>
+                      <div className="pt-2 flex items-center justify-center gap-3">
+                        <button 
+                          onClick={loadDashboardData}
+                          className="px-4 py-2 bg-[#121215] border border-zinc-800 text-xs text-zinc-300 hover:text-white rounded-lg transition-colors cursor-pointer flex items-center gap-2"
+                        >
+                          <RefreshCw className="w-3.5 h-3.5" />
+                          <span>Refresh Connection</span>
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
@@ -2747,6 +2818,18 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
                             
                             // Filter list
                             const filteredFeed = activities.filter(act => {
+                              if (act.type === 'whale_purchase') {
+                                return false;
+                              }
+                              // Apply personalized listing alert constraints (must be in watchlist and hourly delayed)
+                              if (act.type === 'normie_listing') {
+                                const inWatchlist = watchlist.some(w => w.id === act.normieId);
+                                const isHourlyDelayed = Date.now() - act.timestamp >= 3600000;
+                                if (!inWatchlist || !isHourlyDelayed) {
+                                  return false;
+                                }
+                              }
+
                               // Category filter
                               if (signalsFilter !== 'All') {
                                 if (signalsFilter === 'Canvas' && act.type !== 'canvas_updated') return false;
@@ -2756,7 +2839,13 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
                                 if (signalsFilter === 'Burns' && act.type !== 'normie_burned') return false;
                                 if (signalsFilter === 'Sales' && act.type !== 'normie_sale') return false;
                                 if (signalsFilter === 'Listings' && act.type !== 'normie_listing') return false;
-                                if (signalsFilter === 'Whales' && act.type !== 'whale_purchase') return false;
+                                if (signalsFilter === 'Whales') {
+                                  const whaleAddrs = new Set(whalesList.map(w => w.address));
+                                  const isWhaleType = act.type === 'whale_purchase';
+                                  const isWhaleUser = act.userAddress && whaleAddrs.has(act.userAddress);
+                                  const isWhaleReceiver = act.toAddress && whaleAddrs.has(act.toAddress);
+                                  if (!isWhaleType && !isWhaleUser && !isWhaleReceiver) return false;
+                                }
                                 if (signalsFilter === 'Watchlist' && !watchlist.some(w => w.id === act.normieId)) return false;
                               }
                               
@@ -2857,7 +2946,7 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
                                     };
                                   } else if (act.type === 'normie_listing') {
                                     theme = {
-                                      label: 'Listing',
+                                      label: 'Hourly Listing',
                                       color: 'text-indigo-400',
                                       bg: 'bg-indigo-950/20 border border-indigo-900/30',
                                       accent: 'border-indigo-950/30 hover:border-zinc-750',
@@ -2953,37 +3042,22 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
 
                                           {/* Dynamic descriptions & layout details exactly matching reference */}
                                           {act.type === 'canvas_updated' && (
-                                            <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                                              <span className="text-[11px] text-zinc-500 font-sans">
-                                                +{((parseInt(act.normieId) || 3) % 4) + 2} new layers saved on-chain
-                                              </span>
-                                              {/* Layers grid: small custom colors squares representation */}
-                                              <div className="flex items-center gap-1">
-                                                <span className="w-3.5 h-3.5 rounded bg-blue-500/30 border border-blue-500/40" />
-                                                <span className="w-3.5 h-3.5 rounded bg-purple-500/30 border border-purple-500/40" />
-                                                <span className="w-3.5 h-3.5 rounded bg-green-500/30 border border-green-500/40" />
-                                                <span className="w-3.5 h-3.5 rounded bg-amber-500/30 border border-amber-500/40" />
-                                                <span className="text-[10px] text-zinc-600 font-bold font-mono ml-0.5">+2</span>
-                                              </div>
+                                            <div className="mt-2 flex items-center gap-1.5 text-[11px] text-zinc-500 font-sans">
+                                              <span>Customized by:</span>
+                                              <span className="text-zinc-400 font-mono font-semibold">{displayAddress(act.userAddress, act.id)}</span>
                                             </div>
                                           )}
 
                                           {act.type === 'zombie_conversion' && (
-                                            <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] font-sans">
-                                              <span className="text-zinc-500">Zombie status activated</span>
-                                              <div className="flex items-center gap-1.5 font-mono bg-purple-950/15 border border-purple-900/20 rounded px-1.5 py-0.5">
-                                                <span className="text-zinc-500">{(((parseInt(act.normieId) || 5) % 10) * 0.15 + 1.25).toFixed(2)} ETH</span>
-                                                <span className="text-purple-400">→</span>
-                                                <span className="text-white font-bold">{((((parseInt(act.normieId) || 5) % 10) * 0.15 + 1.25) * 1.6).toFixed(2)} ETH</span>
-                                                <span className="text-emerald-400 font-bold ml-1">↑ 60.0%</span>
-                                              </div>
+                                            <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] font-sans text-zinc-500">
+                                              <span>Transformation completed on-chain by:</span>
+                                              <span className="text-zinc-400 font-mono font-semibold">{displayAddress(act.userAddress, act.id)}</span>
                                             </div>
                                           )}
 
                                           {act.type === 'legendary_acquired' && (
-                                            <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] font-sans">
-                                              <span className="text-zinc-500">Rarity Score: <strong className="text-zinc-300">{(95 + ((parseInt(act.normieId) || 0) % 50) * 0.1).toFixed(1)}</strong></span>
-                                              <span className="text-emerald-400 font-bold font-mono">Floor impact: ↑ +{(5 + ((parseInt(act.normieId) || 0) % 20) * 0.5).toFixed(1)}%</span>
+                                            <div className="mt-2 text-[11px] text-zinc-500 font-sans">
+                                              Legendary 1-of-1 Normie acquired on-chain by <span className="text-zinc-400 font-mono font-semibold">{displayAddress(act.userAddress, act.id)}</span>
                                             </div>
                                           )}
 
@@ -3008,41 +3082,8 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
                                           )}
 
                                           {act.type === 'whale_purchase' && (
-                                            <div className="mt-2.5 space-y-2">
-                                              <div className="text-[11px] text-zinc-500 font-mono">
-                                                Wallet: <span className="text-zinc-300 font-semibold">{displayAddress(act.userAddress, act.id)}</span> purchased {((parseInt(act.normieId) || 0) % 4) + 3} Normies
-                                              </div>
-                                              {/* Dynamic lineup of purchased items */}
-                                              <div className="flex items-center gap-1">
-                                                {(() => {
-                                                  const c = ((parseInt(act.normieId) || 0) % 4) + 3; // 3 to 6
-                                                  const base = parseInt(act.normieId) || 281;
-                                                  const list = Array.from({ length: c }).map((_, i) => ((base + i * 147) % 9999) + 1);
-                                                  return (
-                                                    <>
-                                                      {list.slice(0, 5).map((id) => (
-                                                        <span 
-                                                          key={id} 
-                                                          className="w-6 h-6 rounded bg-zinc-900 border border-zinc-800 overflow-hidden flex items-center justify-center cursor-pointer transition-transform hover:scale-110" 
-                                                          title={`Normie #${id}`}
-                                                          onClick={async (e) => {
-                                                            e.stopPropagation();
-                                                            try {
-                                                              const matched = await getNormieById(id.toString());
-                                                              if (matched) onSelectNormie(matched);
-                                                            } catch {}
-                                                          }}
-                                                        >
-                                                          <img src={`https://api.normies.art/normie/${id}/image.png`} className="w-5 h-5 object-contain" />
-                                                        </span>
-                                                      ))}
-                                                      {c > 5 && (
-                                                        <span className="text-[9px] text-zinc-500 font-bold font-mono pl-1">+{c - 5}</span>
-                                                      )}
-                                                    </>
-                                                  );
-                                                })()}
-                                              </div>
+                                            <div className="mt-2 text-[11px] text-zinc-500 font-mono">
+                                              Wallet <span className="text-zinc-300 font-semibold">{displayAddress(act.userAddress, act.id)}</span> acquired {act.batchCount || 1} Normies on-chain
                                             </div>
                                           )}
 
@@ -3070,34 +3111,34 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
                                         {act.type === 'normie_sale' ? (
                                           <div className="text-right">
                                             <div className="text-sm font-bold font-mono text-emerald-400 tracking-tight">
-                                              {act.price !== undefined ? `${act.price} ETH` : '3.25 ETH'}
+                                              {act.price !== undefined ? `${act.price} ETH` : '0.18 ETH'}
                                             </div>
                                             <div className="text-[10px] text-zinc-500 font-mono">
-                                              ${((act.price ?? 3.25) * 3000).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                              ${((act.price ?? 0.18) * 3000).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </div>
                                           </div>
                                         ) : act.type === 'normie_listing' ? (
                                           <div className="text-right">
                                             <div className="text-sm font-bold font-mono text-indigo-400 tracking-tight">
-                                              {act.price !== undefined ? `${act.price} ETH` : '3.90 ETH'}
+                                              {act.price !== undefined ? `${act.price} ETH` : '0.18 ETH'}
                                             </div>
                                             <div className="text-[10px] text-zinc-500 font-mono">
-                                              ${((act.price ?? 3.90) * 3000).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                              ${((act.price ?? 0.18) * 3000).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </div>
                                           </div>
                                         ) : act.type === 'whale_purchase' ? (
                                           <div className="text-right">
                                             <div className="text-sm font-bold font-mono text-white tracking-tight">
-                                              {act.price !== undefined ? `${act.price} ETH` : '16.2 ETH'}
+                                              {act.price !== undefined ? `${act.price} ETH` : `${((act.batchCount || 1) * 0.18).toFixed(2)} ETH`}
                                             </div>
                                             <div className="text-[10px] text-zinc-500 font-mono">
-                                              ${((act.price ?? 16.2) * 3000).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                              ${((act.price ?? (act.batchCount || 1) * 0.18) * 3000).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                             </div>
                                           </div>
                                         ) : act.type === 'normie_transferred' ? (
                                           <div className="text-right">
                                             <div className="text-[10px] text-zinc-500 font-sans uppercase font-bold tracking-wider">Est. Value</div>
-                                            <div className="text-[11px] font-bold font-mono text-zinc-300">{act.price !== undefined ? `${act.price} ETH` : `${(1.15 + ((parseInt(act.normieId) || 0) % 10) * 0.15).toFixed(2)} ETH`}</div>
+                                            <div className="text-[11px] font-bold font-mono text-zinc-300">{act.price !== undefined ? `${act.price} ETH` : '0.18 ETH'}</div>
                                           </div>
                                         ) : null}
 
@@ -3191,25 +3232,25 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
                                     <div>
                                       <span className="text-zinc-500 text-[10px] block">Floor Price</span>
                                       <span className="text-sm font-bold font-mono text-white block">
-                                        {marketStats.floorPrice ? `${marketStats.floorPrice.toFixed(3)} ETH` : '---'}
+                                        {marketStats.floorPrice ? `${marketStats.floorPrice.toFixed(3)} ETH` : '--'}
                                       </span>
                                     </div>
                                     <div>
                                       <span className="text-zinc-500 text-[10px] block">24H Volume</span>
                                       <span className="text-sm font-bold font-mono text-white block">
-                                        {marketStats.isReal && marketStats.volume24h ? `${marketStats.volume24h.toFixed(3)} ETH` : '---'}
+                                        --
                                       </span>
                                     </div>
                                     <div>
                                       <span className="text-zinc-500 text-[10px] block">Total Listed</span>
                                       <span className="text-sm font-bold font-mono text-white block">
-                                        {marketStats.listedCount ? `${marketStats.listedCount} Listed` : '---'}
+                                        --
                                       </span>
                                     </div>
                                     <div>
                                       <span className="text-zinc-500 text-[10px] block">Unique Owners</span>
                                       <span className="text-sm font-bold font-mono text-white block">
-                                        {marketStats.ownerCount ? marketStats.ownerCount.toLocaleString() : '---'}
+                                        --
                                       </span>
                                     </div>
                                   </>
@@ -3219,28 +3260,21 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
                                       <span className="text-zinc-500 text-[10px] block">Floor Price</span>
                                       <div className="h-4 w-16 bg-zinc-900 rounded" />
                                     </div>
-                                    <div className="space-y-1 animate-pulse">
+                                    <div>
                                       <span className="text-zinc-500 text-[10px] block">24H Volume</span>
-                                      <div className="h-4 w-16 bg-zinc-900 rounded" />
+                                      <span className="text-sm font-bold font-mono text-white block">--</span>
                                     </div>
-                                    <div className="space-y-1 animate-pulse">
+                                    <div>
                                       <span className="text-zinc-500 text-[10px] block">Total Listed</span>
-                                      <div className="h-4 w-16 bg-zinc-900 rounded" />
+                                      <span className="text-sm font-bold font-mono text-white block">--</span>
                                     </div>
-                                    <div className="space-y-1 animate-pulse">
+                                    <div>
                                       <span className="text-zinc-500 text-[10px] block">Unique Owners</span>
-                                      <div className="h-4 w-16 bg-zinc-900 rounded" />
+                                      <span className="text-sm font-bold font-mono text-white block">--</span>
                                     </div>
                                   </>
                                 )}
                               </div>
-
-                              {marketStats?.lastSalePrice && (
-                                <div className="border-t border-zinc-900/80 pt-2 mt-1 flex items-center justify-between text-[11px]">
-                                  <span className="text-zinc-500">Last Registered Sale:</span>
-                                  <span className="font-mono text-emerald-400 font-bold">{marketStats.lastSalePrice.toFixed(3)} ETH</span>
-                                </div>
-                              )}
                             </div>
 
                             <div className="flex flex-col gap-2 pt-1">
@@ -3365,11 +3399,9 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
                         </div>
 
                         {/* Widget 5: Pinned Featured Alert - Zombie Detected only */}
-                        {(() => {
-                          const alertTarget = activities.find(a => a.type === 'zombie_conversion') 
-                            || { normieId: '6621', type: 'zombie_conversion', title: 'Zombie Transformation' };
-
-                          const alertId = alertTarget.normieId || '6621';
+                        {activeZombieAlert && (() => {
+                          const alertTarget = activeZombieAlert;
+                          const alertId = alertTarget.normieId;
                           const alertTypeLabel = 'Zombie Detected';
                           const alertTitle = 'Zombie Conversion Detected';
                           const alertDesc = `Normie #${alertId} has just completed on-chain Zombie transformation, updating its status and score instantly.`;
@@ -3381,7 +3413,7 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
                               </div>
                               
                               <div className="space-y-1">
-                                <span className="text-[9px] font-extrabold uppercase tracking-widest text-emerald-400 font-mono">{alertTypeLabel}</span>
+                                <span className="text-[9px] font-extrabold uppercase tracking-widest text-purple-400 font-mono">{alertTypeLabel}</span>
                                 <h4 className="text-sm font-bold text-white tracking-tight">{alertTitle}</h4>
                               </div>
 

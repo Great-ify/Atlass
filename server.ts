@@ -101,7 +101,7 @@ async function startServer() {
 
       res.json({
         floorPrice,
-        volume24h,
+        volume24h: isReal ? volume24h : null,
         listedCount,
         ownerCount,
         lastSalePrice,
@@ -263,68 +263,10 @@ async function startServer() {
         }
       }
 
-      // Fallback high-fidelity simulation if both fail
+      // Fallback: If both fail, return an empty array indicating no active live market events are available at this moment.
       if (events.length === 0) {
-        console.log(`[Proxy] Serving simulated high-fidelity activities`);
-        const mockAddresses = [
-          "0x89205A3A3b2A6adF410B5d1A94b5A6D5c67890f5",
-          "0x2B491295D1A94b5A6D5c67890f589205A3A3b2A",
-          "0x1A94b5A6D5c67890f589205A3A3b2A89205A3A3b",
-          "0x3291295D1A94b5A6D5c67890f589205A3A3b2A89",
-          "0x7890f589205A3A3b2A1A94b5A6D5c67890f58920"
-        ];
-        
-        const eventTypes = ['normie_sale', 'normie_listing', 'zombie_conversion', 'legendary_acquired', 'whale_purchase'];
-        
-        events = Array.from({ length: limit }).map((_, index) => {
-          const randType = eventTypes[index % eventTypes.length];
-          const normieId = (Math.floor(Math.random() * 9999) + 1).toString();
-          const userAddress = mockAddresses[index % mockAddresses.length];
-          const timestamp = Date.now() - index * 600000;
-          
-          const secondsAgo = Math.floor((Date.now() - timestamp) / 1000);
-          let timeAgo = 'Just now';
-          if (secondsAgo >= 86400) timeAgo = `${Math.floor(secondsAgo / 86400)}d ago`;
-          else if (secondsAgo >= 3600) timeAgo = `${Math.floor(secondsAgo / 3600)}h ago`;
-          else if (secondsAgo >= 60) timeAgo = `${Math.floor(secondsAgo / 60)}m ago`;
-
-          let title = 'Canvas customized';
-          let price: number | undefined;
-          let toAddress: string | undefined;
-          
-          if (randType === 'normie_sale') {
-            title = 'Normie Sold';
-            price = parseFloat((0.15 + Math.random() * 0.08).toFixed(3));
-            toAddress = mockAddresses[(index + 1) % mockAddresses.length];
-          } else if (randType === 'normie_listing') {
-            title = 'Normie Listed';
-            price = parseFloat((0.16 + Math.random() * 0.09).toFixed(3));
-          } else if (randType === 'zombie_conversion') {
-            title = 'Zombie conversion';
-          } else if (randType === 'legendary_acquired') {
-            title = 'Legendary canvas';
-          } else if (randType === 'whale_purchase') {
-            title = 'Whale acquired';
-            price = parseFloat((0.5 + Math.random() * 1.2).toFixed(2));
-          } else if (randType === 'normie_transferred') {
-            title = 'Normie Transferred';
-            toAddress = mockAddresses[(index + 2) % mockAddresses.length];
-          }
-
-          return {
-            id: `sim_event_${index}`,
-            type: randType,
-            title,
-            normieName: `Normie #${normieId}`,
-            normieId,
-            userAddress,
-            toAddress,
-            timeAgo,
-            timestamp,
-            price,
-            isReal: false
-          };
-        });
+        console.log(`[Proxy] No real market events retrieved from OpenSea or Reservoir, returning empty array.`);
+        events = [];
       }
 
       res.json(events);

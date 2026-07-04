@@ -103,7 +103,7 @@ export default function App() {
     e.preventDefault();
     const targetEmail = isFooter ? footerEmail : email;
     if (!targetEmail || !targetEmail.includes('@')) {
-      triggerToast('Please provide a valid email coordinate address.');
+      triggerToast('Please provide a valid email address.');
       return;
     }
 
@@ -121,7 +121,7 @@ export default function App() {
       const savedList = JSON.parse(localStorage.getItem('atlas_subscriptions') || '[]');
       savedList.push({ email: targetEmail, date: new Date().toISOString() });
       localStorage.setItem('atlas_subscriptions', JSON.stringify(savedList));
-      triggerToast('Coordinates saved. Early access whitelisting verified.');
+      triggerToast('Thank you! You have been added to our early access list.');
     }, 1000);
   };
 
@@ -425,9 +425,6 @@ export default function App() {
                     referrerPolicy="no-referrer"
                   />
                 ))}
-                <div className="w-6.5 h-6.5 rounded-full bg-atlas-surface border-2 border-[#09090B] flex items-center justify-center text-[8px] font-mono font-bold text-atlas-secondary">
-                  +2.4K
-                </div>
               </div>
               <div className="text-[10px] font-mono text-zinc-500">
                 <span className="text-atlas-success font-semibold">● Live data</span>
@@ -449,7 +446,6 @@ export default function App() {
         <section id="stats" className="space-y-4 pt-4 border-t border-zinc-900/40">
           <div className="flex items-center justify-between">
             <h3 className="text-xs font-mono uppercase tracking-wider text-zinc-500 font-semibold">Real-time Ecosystem Metrics</h3>
-            <span className="text-[10px] text-zinc-600 font-mono">On-chain indexer sequences</span>
           </div>
 
           <motion.div 
@@ -609,7 +605,7 @@ export default function App() {
               <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-500 font-bold">Ready to explore?</span>
               <h2 className="text-2xl md:text-3xl font-bold font-sans text-atlas-primary tracking-tight leading-tight">Dive into the intelligence layer for Normies.</h2>
               <p className="text-xs text-atlas-secondary font-sans leading-relaxed max-w-sm">
-                Whitelisting coordinate is now open. Register your coordinate email address to secure early priority indexing queues.
+                Early registration is now open. Enter your email to secure your spot and receive regular updates.
               </p>
             </motion.div>
 
@@ -630,7 +626,7 @@ export default function App() {
                 >
                   <Check className="w-5 h-5 text-emerald-500" />
                   <span className="text-xs font-semibold text-emerald-400 font-mono">EARLY ACCESS GRANTED</span>
-                  <span className="text-[10px] text-zinc-500 font-mono">Coordinates updated. We will ping you soon.</span>
+                  <span className="text-[10px] text-zinc-500 font-mono">You're on the list! We will email you soon.</span>
                 </motion.div>
               ) : (
                 <form onSubmit={(e) => handleSubscribe(e, false)} className="flex items-center gap-2 bg-[#09090B] border border-atlas-border rounded-lg p-1">

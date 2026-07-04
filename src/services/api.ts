@@ -345,7 +345,8 @@ export async function fetchTopTraits(): Promise<TraitStatItem[]> {
       });
     }
     
-    traitList.sort((a, b) => b.percentage - a.percentage);
+    // Sort by percentage ascending to prioritize and highlight the rarest/coolest trending traits first
+    traitList.sort((a, b) => a.percentage - b.percentage);
     
     return traitList.slice(0, 5);
   } catch (err) {
@@ -404,12 +405,13 @@ export async function fetchMarketStats(): Promise<MarketStats> {
     console.warn('Failed to fetch market stats from API, returning realistic fallbacks:', err);
     return {
       floorPrice: 0.18,
-      volume24h: 0.45,
+      volume24h: 0,
       listedCount: 350,
       ownerCount: 3250,
       lastSalePrice: 0.18,
       lastSaleTokenId: "512",
-      lastSaleImage: "https://api.normies.art/normie/512/image.png"
+      lastSaleImage: "https://api.normies.art/normie/512/image.png",
+      isReal: false
     };
   }
 }

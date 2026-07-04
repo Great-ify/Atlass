@@ -69,11 +69,11 @@ export interface TraitStatItem {
 }
 
 export interface MarketStats {
-  floorPrice: number;
-  volume24h: number;
-  listedCount: number;
-  ownerCount: number;
-  lastSalePrice: number;
+  floorPrice: string;
+  volume24h: string;
+  listedCount: string;
+  ownerCount: string;
+  lastSalePrice: string;
   lastSaleTokenId: string;
   lastSaleImage: string;
   isReal?: boolean;

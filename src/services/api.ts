@@ -402,14 +402,14 @@ export async function fetchMarketStats(): Promise<MarketStats> {
     if (!res.ok) throw new Error(`Market stats API error ${res.status}`);
     return await res.json();
   } catch (err) {
-    console.warn('Failed to fetch market stats from API, returning realistic fallbacks:', err);
+    console.warn('Failed to fetch market stats from API, returning placeholders:', err);
     return {
-      floorPrice: 0.18,
-      volume24h: 0,
-      listedCount: 350,
-      ownerCount: 3250,
-      lastSalePrice: 0.18,
-      lastSaleTokenId: "512",
+      floorPrice: "--",
+      volume24h:  "--",
+      listedCount:   "--",
+      ownerCount:  "--",
+      lastSalePrice:  "--",
+      lastSaleTokenId: "--",
       lastSaleImage: "https://api.normies.art/normie/512/image.png",
       isReal: false
     };

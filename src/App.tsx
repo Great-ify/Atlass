@@ -30,7 +30,7 @@ export default function App() {
   // Selected inspect item for detail views
   const [selectedNormie, setSelectedNormie] = useState<NormieItem | null>(null);
   
-  // App Demo Mock Dashboard Trigger State
+  // App Dashboard Trigger State
   const [demoActive, setDemoActive] = useState(false);
 
   // Synchronize Privy redirection callback to automatically route to app workspace
@@ -98,7 +98,7 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  // Sign up simulation
+  // Sign up
   const handleSubscribe = (e: FormEvent, isFooter: boolean) => {
     e.preventDefault();
     const targetEmail = isFooter ? footerEmail : email;
@@ -753,9 +753,9 @@ export default function App() {
         <div className="max-w-7xl mx-auto pt-8 flex flex-col sm:flex-row items-center justify-between text-[11px] text-zinc-600 font-mono gap-4">
           <span>© 2026 Atlas. All rights reserved. Built for Intelligence.</span>
           <div className="flex items-center gap-4">
-            <a href="#" className="hover:text-white transition-colors">Privacy Node</a>
+            <a href="#" className="hover:text-white transition-colors">Privacy</a>
             <span>•</span>
-            <a href="#" className="hover:text-white transition-colors">Terms of Vector</a>
+            <a href="#" className="hover:text-white transition-colors">Terms of Servie</a>
           </div>
         </div>
       </footer>

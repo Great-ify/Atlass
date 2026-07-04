@@ -119,7 +119,7 @@ export default function AppDemoMode({ onClose, onOpenSearch, onSelectNormie, ini
   const lastProcessedZombieRef = useRef<string>('');
 
 
-
+// demo chart
   const getChartData = () => {
     switch (chartTimeframe) {
       case '30D':

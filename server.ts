@@ -12,13 +12,13 @@ async function startServer() {
   // Market statistics route fetching real-time OpenSea or Reservoir data
   app.get("/api/market/stats", async (req, res) => {
     try {
-      // Default live estimation values matching actual Base market
-      let floorPrice = 0.18;
-      let volume24h = 0.45;
-      let listedCount = 350;
-      let ownerCount = 3250;
+      // Default live Data
+      let floorPrice = "--";
+      let volume24h = "--";
+      let listedCount =  "--";
+      let ownerCount =  "--";
       let lastSalePrice = cachedLastSalePrice;
-      let lastSaleTokenId = "512";
+      let lastSaleTokenId = "--";
       let lastSaleImage = "https://api.normies.art/normie/512/image.png";
       let isReal = false;
 

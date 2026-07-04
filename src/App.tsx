@@ -688,9 +688,9 @@ export default function App() {
           <div>
             <h5 className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 font-bold mb-3.5">Product</h5>
             <ul className="space-y-2.5 text-xs text-zinc-400">
-              <li><a href="#features" className="hover:text-white transition-colors">Ecosystem Features</a></li>
-              <li><a href="#stats" className="hover:text-white transition-colors">Live Stats Grid</a></li>
-              <li><button onClick={() => setDemoActive(true)} className="hover:text-white transition-colors text-left">Explorer Portal</button></li>
+              <li><a href="#features" className="hover:text-white transition-colors"> Features</a></li>
+              <li><a href="#stats" className="hover:text-white transition-colors">Live Stats</a></li>
+              <li><button onClick={() => setDemoActive(true)} className="hover:text-white transition-colors text-left">App</button></li>
             </ul>
           </div>
 
